@@ -50,6 +50,7 @@ function tryUnlock() {
 }
 function enterApp() {
   $("#gate").hidden = true;
+  $("#loadingVeil").hidden = false;
   $("#app").hidden = false;
   $("#modeBadge").textContent = state.editMode ? "✏️ 편집 가능" : "👀 보기 전용";
   $("#modeBadge").classList.toggle("edit", state.editMode);
@@ -58,12 +59,18 @@ function enterApp() {
 
 // ---------- data load ----------
 async function boot() {
-  await loadProject();
-  await loadTasks();
+  try {
+    await loadProject();
+    await loadTasks();
+    renderAll();
+    wireStaticUI();
+    subscribeRealtime();
+  } catch (e) {
+    console.error(e);
+    $("#loadingVeil").textContent = "불러오는 중 오류가 발생했습니다: " + (e?.message || e);
+    return;
+  }
   $("#loadingVeil").hidden = true;
-  renderAll();
-  wireStaticUI();
-  subscribeRealtime();
 }
 
 async function loadProject() {

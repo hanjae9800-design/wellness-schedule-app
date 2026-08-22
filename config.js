@@ -3,7 +3,7 @@
 window.APP_CONFIG = {
   SUPABASE_URL: "https://efitdkbtzdbscweehdma.supabase.co",
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVmaXRka2J0emRic2N3ZWVoZG1hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0MDQxMjAsImV4cCI6MjEwMjk4MDEyMH0.S_1_WoQFsmV6UGeAnTGwoAUZVkyB6gXjz3xtuhdaO6Y",
-  TEAM_PASSWORD: "CHANGE_ME",
+  TEAM_PASSWORD: "mind2026*",
   PROJECT_NAME: "웰니스관광",
   PROJECT_ORG: "서울웰니스관광육성사업"
 };
