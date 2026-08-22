@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>프로젝트 추진일정</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Noto+Serif+KR:wght@600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="gate" id="gate">
+  <div class="gate-box">
+    <h1>프로젝트 추진일정</h1>
+    <p>팀 공용 비밀번호를 입력해주세요</p>
+    <input type="password" id="gatePassword" placeholder="비밀번호" autocomplete="current-password">
+    <button class="primary" id="gateSubmit">들어가기</button>
+    <div class="gate-error" id="gateError"></div>
+    <button class="link-btn" id="viewOnlyBtn">비밀번호 없이 보기만 하기</button>
+  </div>
+</div>
+
+<div class="loading-veil" id="loadingVeil">불러오는 중…</div>
+
+<div id="app" class="app" hidden>
+
+  <div class="sync-banner" id="syncBanner" hidden></div>
+
+  <header class="page-head">
+    <div class="eyebrow-fields">
+      <input id="orgInput" class="eyebrow-input" placeholder="상위 사업명">
+      <span class="eyebrow-sep">/</span>
+      <input id="deptInput" class="eyebrow-input" placeholder="부서명">
+    </div>
+    <h1 class="title">
+      <input id="projNameInput" class="title-input" placeholder="프로젝트명만 입력">
+      <span class="title-suffix">추진일정</span>
+    </h1>
+    <div class="head-actions">
+      <span class="saving-dot" id="savingDot" hidden>저장 중…</span>
+      <span class="mode-badge" id="modeBadge"></span>
+    </div>
+  </header>
+
+  <div class="stats" id="stats"></div>
+
+  <section class="board desktop-only">
+    <div class="board-toolbar">
+      <button class="primary" id="addTaskBtnDesktop">+ 업무 추가</button>
+      <div class="legend" id="legendDesktop"></div>
+    </div>
+    <div class="table-scroll">
+      <table class="task-table" id="taskTable">
+        <thead>
+          <tr>
+            <th class="col-drag"></th>
+            <th class="col-phase">구분</th>
+            <th class="col-name">업무명</th>
+            <th class="col-owner">담당자</th>
+            <th class="col-date">시작일</th>
+            <th class="col-date">종료일</th>
+            <th class="col-dep">선행업무</th>
+            <th class="col-status">상태</th>
+            <th class="col-note">비고</th>
+            <th class="col-del"></th>
+          </tr>
+        </thead>
+        <tbody id="taskTbody"></tbody>
+      </table>
+    </div>
+    <div class="gantt-wrap" id="ganttWrap">
+      <div class="gantt" id="gantt"></div>
+    </div>
+  </section>
+
+  <section class="cards mobile-only">
+    <div class="board-toolbar">
+      <button class="primary" id="addTaskBtnMobile">+ 업무 추가</button>
+      <button class="secondary" id="timelineOpenBtn">📊 타임라인 차트 보기</button>
+    </div>
+    <div class="legend" id="legendMobile"></div>
+    <div class="card-list" id="cardList"></div>
+  </section>
+
+  <div class="gantt-overlay" id="ganttOverlay" hidden>
+    <div class="gantt-overlay-head">
+      <span>타임라인</span>
+      <button id="timelineCloseBtn">닫기 ✕</button>
+    </div>
+    <div class="gantt-overlay-body" id="ganttOverlayBody"></div>
+  </div>
+
+  <div class="color-picker" id="colorPicker" hidden></div>
+</div>
+
+<script src="config.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>
