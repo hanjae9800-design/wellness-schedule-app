@@ -70,7 +70,7 @@ function renderFilterOptions() {
   ["#filterStatus", "#filterStatusMobile"].forEach(sel => { $(sel).value = taskFilters.status; });
 }
 function applyTaskFilters() {
-  $$("#taskTbody tr").forEach(row => {
+  $$("#taskTbody tr[data-id]").forEach(row => {
     const t = state.tasks.find(x => x.id === row.dataset.id);
     row.hidden = !(t && taskMatchesFilters(t));
   });
@@ -472,7 +472,11 @@ function renderTable() {
       <td class="col-del">${state.editMode ? `<button class="del-btn" data-action="del" data-id="${t.id}">✕</button>` : ""}</td>
     </tr>
   `;
-  }).join("");
+  }).join("") + (state.editMode ? `
+    <tr class="add-task-row">
+      <td colspan="11"><button type="button" class="add-task-row-btn" id="addTaskBtnDesktop">+ 업무 추가</button></td>
+    </tr>
+  ` : "");
 
   tbody.querySelectorAll("input,select").forEach(el => {
     el.addEventListener("change", () => {
@@ -485,12 +489,14 @@ function renderTable() {
     if (e.target.tagName === "INPUT") return;
     if (state.editMode) openColorPicker(el, el.dataset.id);
   }));
+  const addBtn = tbody.querySelector("#addTaskBtnDesktop");
+  if (addBtn) addBtn.addEventListener("click", addTask);
   wireDragReorder(tbody);
 }
 
 function wireDragReorder(tbody) {
   let dragEl = null;
-  tbody.querySelectorAll("tr").forEach(row => {
+  tbody.querySelectorAll("tr[data-id]").forEach(row => {
     row.addEventListener("dragstart", () => { dragEl = row; row.classList.add("dragging"); });
     row.addEventListener("dragend", () => { row.classList.remove("dragging"); dragEl = null; });
     row.addEventListener("dragover", (e) => {
@@ -501,7 +507,7 @@ function wireDragReorder(tbody) {
       row.parentNode.insertBefore(dragEl, before ? row : row.nextSibling);
     });
     row.addEventListener("drop", () => {
-      const ids = Array.from(tbody.querySelectorAll("tr")).map(r => r.dataset.id);
+      const ids = Array.from(tbody.querySelectorAll("tr[data-id]")).map(r => r.dataset.id);
       state.tasks.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
       persistOrder();
     });
@@ -655,7 +661,7 @@ function renderCards() {
       </div>
     </div>
   `;
-  }).join("");
+  }).join("") + (state.editMode ? `<button type="button" class="add-task-card-btn" id="addTaskBtnMobile">+ 업무 추가</button>` : "");
 
   list.querySelectorAll("input,select").forEach(el => {
     el.addEventListener("change", () => {
@@ -670,6 +676,8 @@ function renderCards() {
     if (e.target.tagName === "INPUT") return;
     if (state.editMode) openColorPicker(el, el.dataset.id);
   }));
+  const addBtnMobile = list.querySelector("#addTaskBtnMobile");
+  if (addBtnMobile) addBtnMobile.addEventListener("click", addTask);
 
   renderFilterOptions();
   applyTaskFilters();
@@ -779,10 +787,6 @@ function wireStaticUI() {
     updateProjectField("status", $("#statusSelect").value);
     renderHeader();
   });
-  $("#addTaskBtnDesktop").addEventListener("click", addTask);
-  $("#addTaskBtnMobile").addEventListener("click", addTask);
-  $("#addTaskBtnDesktop").hidden = !state.editMode;
-  $("#addTaskBtnMobile").hidden = !state.editMode;
   $("#timelineOpenBtn").addEventListener("click", () => {
     $("#ganttOverlayBody").innerHTML = buildGanttHtml(state.tasks, 14);
     $("#ganttOverlay").hidden = false;
