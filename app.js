@@ -484,8 +484,11 @@ function renderCards() {
 function openColorPicker(anchorEl, taskId) {
   const picker = $("#colorPicker");
   const rect = anchorEl.getBoundingClientRect();
-  picker.style.top = (window.scrollY + rect.bottom + 6) + "px";
-  picker.style.left = Math.min(window.scrollX + rect.left, window.innerWidth - 220) + "px";
+  const pickerHeight = 190;
+  let top = rect.bottom + 6;
+  if (top + pickerHeight > window.innerHeight) top = Math.max(8, rect.top - pickerHeight - 6);
+  picker.style.top = top + "px";
+  picker.style.left = Math.min(rect.left, window.innerWidth - 220) + "px";
   const current = state.tasks.find(t => t.id === taskId)?.phase_color;
   picker.innerHTML = PALETTE.map(c => `<span class="color-swatch ${c === current ? "selected" : ""}" style="background:${c}" data-color="${c}"></span>`).join("");
   picker.hidden = false;
