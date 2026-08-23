@@ -66,6 +66,14 @@ function buildOwnerSelectHtml(owner, taskId, dis) {
     .join("");
   return `<select data-field="owner" data-id="${taskId}" ${dis}>${optsHtml}</select>`;
 }
+function buildTaskStatusSelectHtml(t, ts, dis) {
+  const todoLabel = ts.key === "delayed" ? "지연" : "예정";
+  return `<select class="task-status-badge ${ts.key}" data-field="status" data-id="${t.id}" ${dis}>
+    <option value="todo" ${t.status === "todo" ? "selected" : ""}>${todoLabel}</option>
+    <option value="doing" ${t.status === "doing" ? "selected" : ""}>진행중</option>
+    <option value="done" ${t.status === "done" ? "selected" : ""}>완료</option>
+  </select>`;
+}
 
 // ---------- entry (no password gate: anyone with the link can edit) ----------
 function getProjectIdFromUrl() {
@@ -425,16 +433,11 @@ function renderTable() {
         <input value="${escapeHtml(t.phase_name)}" data-field="phase_name" data-id="${t.id}" ${dis}>
       </span></td>
       <td><input value="${escapeHtml(t.name)}" data-field="name" data-id="${t.id}" ${dis} placeholder="업무명"></td>
-      <td class="col-taskstatus"><span class="task-status-badge ${ts.key}">${ts.label}</span></td>
+      <td class="col-taskstatus">${buildTaskStatusSelectHtml(t, ts, dis)}</td>
       <td>${buildOwnerSelectHtml(t.owner, t.id, dis)}</td>
       <td><input type="date" value="${t.start_date || ""}" data-field="start_date" data-id="${t.id}" ${dis}></td>
       <td><input type="date" value="${t.end_date || ""}" data-field="end_date" data-id="${t.id}" ${dis}></td>
       <td><input value="${escapeHtml(t.dependency)}" data-field="dependency" data-id="${t.id}" ${dis} placeholder="-"></td>
-      <td><select class="status-select" data-status="${t.status}" data-field="status" data-id="${t.id}" ${dis}>
-        <option value="todo" ${t.status === "todo" ? "selected" : ""}>예정</option>
-        <option value="doing" ${t.status === "doing" ? "selected" : ""}>진행중</option>
-        <option value="done" ${t.status === "done" ? "selected" : ""}>완료</option>
-      </select></td>
       <td><input value="${escapeHtml(t.note)}" data-field="note" data-id="${t.id}" ${dis} placeholder="-"></td>
       <td class="col-del">${state.editMode ? `<button class="del-btn" data-action="del" data-id="${t.id}">✕</button>` : ""}</td>
     </tr>
@@ -446,9 +449,6 @@ function renderTable() {
       updateTaskField(el.dataset.id, el.dataset.field, el.value);
       if (["status", "start_date", "end_date"].includes(el.dataset.field)) refreshTaskDerivedViews();
     });
-    if (el.dataset.field === "status") {
-      el.addEventListener("change", () => { el.dataset.status = el.value; });
-    }
   });
   tbody.querySelectorAll('[data-action="del"]').forEach(el => el.addEventListener("click", () => deleteTask(el.dataset.id)));
   tbody.querySelectorAll('[data-action="color"]').forEach(el => el.addEventListener("click", (e) => {
@@ -600,7 +600,7 @@ function renderCards() {
         <span class="phase-pill" style="background:${t.phase_color}" data-action="color" data-id="${t.id}" title="클릭하면 색상을 바꿀 수 있어요">
           <input value="${escapeHtml(t.phase_name)}" data-field="phase_name" data-id="${t.id}" ${dis}>
         </span>
-        <span class="task-status-badge ${ts.key}">${ts.label}</span>
+        ${buildTaskStatusSelectHtml(t, ts, dis)}
         ${state.editMode ? `<div class="move-btns">
           <button class="icon-btn" data-action="up" data-id="${t.id}" ${idx === 0 ? "disabled" : ""}>▲</button>
           <button class="icon-btn" data-action="down" data-id="${t.id}" ${idx === state.tasks.length - 1 ? "disabled" : ""}>▼</button>
@@ -610,11 +610,6 @@ function renderCards() {
       <input class="card-name-input" value="${escapeHtml(t.name)}" data-field="name" data-id="${t.id}" ${dis} placeholder="업무명">
       <div class="card-row">
         <div class="card-field"><label>담당자</label>${buildOwnerSelectHtml(t.owner, t.id, dis)}</div>
-        <div class="card-field"><label>상태</label><select data-field="status" data-id="${t.id}" ${dis}>
-          <option value="todo" ${t.status === "todo" ? "selected" : ""}>예정</option>
-          <option value="doing" ${t.status === "doing" ? "selected" : ""}>진행중</option>
-          <option value="done" ${t.status === "done" ? "selected" : ""}>완료</option>
-        </select></div>
       </div>
       <div class="card-row">
         <div class="card-field"><label>시작일</label><input type="date" value="${t.start_date || ""}" data-field="start_date" data-id="${t.id}" ${dis}></div>
@@ -672,7 +667,7 @@ function openColorPicker(anchorEl, taskId) {
 
 // ---------- task table column resize ----------
 const COL_WIDTH_KEY = "taskTableColWidths";
-const COL_MIN_WIDTH = { phase: 64, name: 90, owner: 60, start: 104, end: 104, dep: 60, status: 70, note: 60 };
+const COL_MIN_WIDTH = { phase: 64, name: 90, owner: 60, start: 104, end: 104, dep: 60, note: 60 };
 const DEFAULT_MIN_COL_WIDTH = 50;
 function loadColWidths() {
   try { return JSON.parse(localStorage.getItem(COL_WIDTH_KEY) || "{}"); } catch (e) { return {}; }

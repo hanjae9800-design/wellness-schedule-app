@@ -138,10 +138,9 @@ h1.title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; font
 .task-status-badge.delayed { background: rgba(168,50,50,0.14); color: var(--delay); border-color: transparent; }
 .task-status-badge.doing { background: rgba(31,111,83,0.14); color: var(--accent); border-color: transparent; }
 .task-status-badge.done { background: rgba(139,148,139,0.18); color: var(--ink-muted); border-color: transparent; }
-.status-select { font-weight: 700; }
-.status-select[data-status="done"] { color: var(--good); }
-.status-select[data-status="doing"] { color: var(--accent-warm); }
-.status-select[data-status="todo"] { color: var(--ink-muted); }
+select.task-status-badge { cursor: pointer; appearance: none; -webkit-appearance: none; -moz-appearance: none; text-align: center; text-align-last: center; }
+select.task-status-badge:disabled { cursor: default; opacity: .85; }
+.task-table select.task-status-badge { width: auto; padding: 3px 8px; border-radius: 999px; background: var(--surface-alt); border: 1px solid var(--border); }
 .del-btn { background: none; border: none; color: var(--ink-muted); cursor: pointer; font-size: 15px; padding: 4px; }
 .del-btn:hover { color: var(--critical); }
 
