@@ -310,6 +310,12 @@ function renderAll() {
   renderGantt();
   renderCards();
 }
+function refreshTaskDerivedViews() {
+  renderStats();
+  renderTable();
+  renderGantt();
+  renderCards();
+}
 function renderHeader() {
   const p = state.project;
   if (!p) return;
@@ -380,7 +386,10 @@ function renderTable() {
   }).join("");
 
   tbody.querySelectorAll("input,select").forEach(el => {
-    el.addEventListener("change", () => updateTaskField(el.dataset.id, el.dataset.field, el.value));
+    el.addEventListener("change", () => {
+      updateTaskField(el.dataset.id, el.dataset.field, el.value);
+      if (["status", "start_date", "end_date"].includes(el.dataset.field)) refreshTaskDerivedViews();
+    });
     if (el.dataset.field === "status") {
       el.addEventListener("change", () => { el.dataset.status = el.value; });
     }
@@ -528,7 +537,10 @@ function renderCards() {
   }).join("");
 
   list.querySelectorAll("input,select").forEach(el => {
-    el.addEventListener("change", () => updateTaskField(el.dataset.id, el.dataset.field, el.value));
+    el.addEventListener("change", () => {
+      updateTaskField(el.dataset.id, el.dataset.field, el.value);
+      if (["status", "start_date", "end_date"].includes(el.dataset.field)) refreshTaskDerivedViews();
+    });
   });
   list.querySelectorAll('[data-action="del"]').forEach(el => el.addEventListener("click", () => deleteTask(el.dataset.id)));
   list.querySelectorAll('[data-action="up"]').forEach(el => el.addEventListener("click", () => moveTask(el.dataset.id, -1)));
