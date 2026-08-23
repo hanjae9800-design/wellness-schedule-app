@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>관리자 — 프로젝트 추진일정</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Noto+Serif+KR:wght@600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<div class="loading-veil" id="loadingVeil">불러오는 중…</div>
+
+<div class="admin-wrap" id="app" hidden>
+  <div class="admin-head">
+    <h1 class="landing-title">관리자</h1>
+    <a href="./" class="back-link">← 목록으로</a>
+  </div>
+
+  <div class="stat-grid" id="statGrid"></div>
+
+  <section class="admin-section">
+    <h2>최근 7일 방문 추이</h2>
+    <div class="bar-chart" id="viewChart"></div>
+  </section>
+
+  <section class="admin-section">
+    <div class="admin-section-head">
+      <h2>피드백 (불편사항 제보)</h2>
+      <div class="feedback-filter" id="feedbackFilter">
+        <button type="button" class="chip active" data-filter="open">미해결</button>
+        <button type="button" class="chip" data-filter="resolved">해결됨</button>
+        <button type="button" class="chip" data-filter="all">전체</button>
+      </div>
+    </div>
+    <div class="feedback-list" id="feedbackList"></div>
+  </section>
+</div>
+
+<script src="config.js"></script>
+<script type="module" src="admin.js"></script>
+</body>
+</html>

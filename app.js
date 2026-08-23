@@ -43,11 +43,17 @@ async function initGate() {
   $("#loadingVeil").hidden = true;
 }
 
+// ---------- usage tracking ----------
+function logPageView(page, projectId) {
+  supabase.from("page_views").insert({ page, project_id: projectId || null }).then(() => {}, () => {});
+}
+
 // ---------- landing (project list) ----------
 let landingProjects = [];
 let selectedProjectIds = new Set();
 
 async function enterLanding() {
+  logPageView("landing", null);
   const { data, error } = await supabase.from("projects").select("*").order("created_at", { ascending: false });
   if (error) throw error;
   landingProjects = data || [];
@@ -121,6 +127,7 @@ function wireLandingUI() {
 async function enterProject(projectId) {
   await loadProject(projectId);
   if (!state.project) { location.href = "./"; return; }
+  logPageView("project", projectId);
   await loadTasks();
   $("#app").hidden = false;
   $("#modeBadge").textContent = "✏️ 편집 가능";

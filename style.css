@@ -62,6 +62,7 @@ button { font-family: inherit; }
 .new-project-fields input { flex: 1; min-width: 140px; font: inherit; font-size: 13.5px; padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: 9px; background: var(--page); color: var(--ink); }
 .back-link { font-size: 12px; color: var(--ink-muted); text-decoration: none; border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; }
 .back-link:hover { border-color: var(--accent); color: var(--accent); }
+.admin-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 
 button.primary { background: var(--accent); color: var(--accent-ink); border: none; border-radius: 9px; padding: 10px 16px; font-weight: 700; font-size: 13.5px; cursor: pointer; }
 button.secondary { background: var(--surface); border: 1px solid var(--border-strong); color: var(--ink); border-radius: 9px; padding: 10px 16px; font-weight: 700; font-size: 13.5px; cursor: pointer; }
