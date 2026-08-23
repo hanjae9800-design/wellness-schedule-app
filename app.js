@@ -48,6 +48,25 @@ function deriveTaskStatus(t) {
   return { key: "todo", label: "예정" };
 }
 
+// ---------- assignee list (PM + 팀원) ----------
+function getAssigneeOptions() {
+  const p = state.project;
+  if (!p) return [];
+  const names = [p.pm, ...(p.team_members || "").split(",")]
+    .map(s => (s || "").trim())
+    .filter(Boolean);
+  return [...new Set(names)];
+}
+function buildOwnerSelectHtml(owner, taskId, dis) {
+  const options = getAssigneeOptions();
+  const current = (owner || "").trim();
+  if (current && !options.includes(current)) options.push(current);
+  const optsHtml = [`<option value=""${current ? "" : " selected"}>미배정</option>`]
+    .concat(options.map(name => `<option value="${escapeHtml(name)}"${name === current ? " selected" : ""}>${escapeHtml(name)}</option>`))
+    .join("");
+  return `<select data-field="owner" data-id="${taskId}" ${dis}>${optsHtml}</select>`;
+}
+
 // ---------- entry (no password gate: anyone with the link can edit) ----------
 function getProjectIdFromUrl() {
   return new URLSearchParams(location.search).get("p");
@@ -323,11 +342,13 @@ function renderHeader() {
   $("#orgInput").value = p.org || "";
   $("#deptInput").value = p.dept || "";
   $("#pmInput").value = p.pm || "";
+  $("#teamInput").value = p.team_members || "";
   $("#projNameInput").value = p.name || "";
   const disabled = !state.editMode;
   $("#orgInput").disabled = disabled;
   $("#deptInput").disabled = disabled;
   $("#pmInput").disabled = disabled;
+  $("#teamInput").disabled = disabled;
   $("#projNameInput").disabled = disabled;
   const st = deriveProjectStatus(p.status || "todo", state.tasks);
   const badge = $("#statusBadge");
@@ -371,7 +392,7 @@ function renderTable() {
       </span></td>
       <td><input value="${escapeHtml(t.name)}" data-field="name" data-id="${t.id}" ${dis} placeholder="업무명"></td>
       <td class="col-taskstatus"><span class="task-status-badge ${ts.key}">${ts.label}</span></td>
-      <td><input value="${escapeHtml(t.owner)}" data-field="owner" data-id="${t.id}" ${dis} placeholder="담당자"></td>
+      <td>${buildOwnerSelectHtml(t.owner, t.id, dis)}</td>
       <td><input type="date" value="${t.start_date || ""}" data-field="start_date" data-id="${t.id}" ${dis}></td>
       <td><input type="date" value="${t.end_date || ""}" data-field="end_date" data-id="${t.id}" ${dis}></td>
       <td><input value="${escapeHtml(t.dependency)}" data-field="dependency" data-id="${t.id}" ${dis} placeholder="-"></td>
@@ -554,7 +575,7 @@ function renderCards() {
       </div>
       <input class="card-name-input" value="${escapeHtml(t.name)}" data-field="name" data-id="${t.id}" ${dis} placeholder="업무명">
       <div class="card-row">
-        <div class="card-field"><label>담당자</label><input value="${escapeHtml(t.owner)}" data-field="owner" data-id="${t.id}" ${dis}></div>
+        <div class="card-field"><label>담당자</label>${buildOwnerSelectHtml(t.owner, t.id, dis)}</div>
         <div class="card-field"><label>상태</label><select data-field="status" data-id="${t.id}" ${dis}>
           <option value="todo" ${t.status === "todo" ? "selected" : ""}>예정</option>
           <option value="doing" ${t.status === "doing" ? "selected" : ""}>진행중</option>
@@ -671,7 +692,16 @@ function wireColumnResize() {
 function wireStaticUI() {
   $("#orgInput").addEventListener("change", () => updateProjectField("org", $("#orgInput").value));
   $("#deptInput").addEventListener("change", () => updateProjectField("dept", $("#deptInput").value));
-  $("#pmInput").addEventListener("change", () => updateProjectField("pm", $("#pmInput").value));
+  $("#pmInput").addEventListener("change", () => {
+    updateProjectField("pm", $("#pmInput").value);
+    renderTable();
+    renderCards();
+  });
+  $("#teamInput").addEventListener("change", () => {
+    updateProjectField("team_members", $("#teamInput").value);
+    renderTable();
+    renderCards();
+  });
   $("#projNameInput").addEventListener("change", () => updateProjectField("name", $("#projNameInput").value));
   $("#statusSelect").addEventListener("change", () => {
     updateProjectField("status", $("#statusSelect").value);
