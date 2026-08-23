@@ -102,7 +102,9 @@ h1.title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; font
 .del-btn { background: none; border: none; color: var(--ink-muted); cursor: pointer; font-size: 15px; padding: 4px; }
 .del-btn:hover { color: var(--critical); }
 
-.gantt-wrap { margin-top: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow-x: auto; padding: 14px; }
+.gantt-wrap { margin-bottom: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow-x: auto; padding: 14px; }
+.section-head { margin: 4px 0 10px; }
+.section-head h2 { font-family: "Noto Serif KR", serif; font-size: 17px; font-weight: 700; }
 .gantt { display: grid; }
 .gantt-row { display: grid; align-items: center; height: 30px; position: relative; border-bottom: 1px solid var(--border); }
 .gantt-row-label { position: sticky; left: 0; background: var(--surface); padding-right: 10px; font-size: 12px; white-space: nowrap; z-index: 2; }
