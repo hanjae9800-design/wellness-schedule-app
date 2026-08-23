@@ -496,6 +496,7 @@ function openColorPicker(anchorEl, taskId) {
     sw.addEventListener("click", () => {
       updateTaskField(taskId, "phase_color", sw.dataset.color);
       picker.hidden = true;
+      renderAll();
     });
   });
   const closeOnOutside = (e) => {
