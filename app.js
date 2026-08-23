@@ -21,39 +21,15 @@ function daysBetween(a, b) {
   return Math.round((new Date(b) - new Date(a)) / 86400000);
 }
 
-// ---------- auth gate ----------
+// ---------- entry (no password gate: anyone with the link can edit) ----------
 function initGate() {
-  const unlocked = sessionStorage.getItem("edit_unlocked") === "1";
-  const viewOnly = sessionStorage.getItem("view_only") === "1";
-  if (unlocked) { state.editMode = true; enterApp(); return; }
-  if (viewOnly) { state.editMode = false; enterApp(); return; }
-
-  $("#gate").hidden = false;
-  $("#gateSubmit").addEventListener("click", tryUnlock);
-  $("#gatePassword").addEventListener("keydown", (e) => { if (e.key === "Enter") tryUnlock(); });
-  $("#viewOnlyBtn").addEventListener("click", () => {
-    sessionStorage.setItem("view_only", "1");
-    state.editMode = false;
-    enterApp();
-  });
-}
-function tryUnlock() {
-  const val = $("#gatePassword").value;
-  if (val === cfg.TEAM_PASSWORD) {
-    sessionStorage.setItem("edit_unlocked", "1");
-    sessionStorage.removeItem("view_only");
-    state.editMode = true;
-    enterApp();
-  } else {
-    $("#gateError").textContent = "비밀번호가 올바르지 않습니다.";
-  }
+  state.editMode = true;
+  enterApp();
 }
 function enterApp() {
-  $("#gate").hidden = true;
-  $("#loadingVeil").hidden = false;
   $("#app").hidden = false;
-  $("#modeBadge").textContent = state.editMode ? "✏️ 편집 가능" : "👀 보기 전용";
-  $("#modeBadge").classList.toggle("edit", state.editMode);
+  $("#modeBadge").textContent = "✏️ 편집 가능";
+  $("#modeBadge").classList.add("edit");
   boot();
 }
 
