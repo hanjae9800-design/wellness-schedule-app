@@ -36,6 +36,17 @@ function deriveProjectStatus(status, tasks) {
   return deriveProjectStatusFromMinStart(status, minStart);
 }
 
+// ---------- task-level status (예정 / 지연 / 진행중 / 완료) ----------
+function deriveTaskStatus(t) {
+  if (t.status === "doing") return { key: "doing", label: "진행중" };
+  if (t.status === "done") return { key: "done", label: "완료" };
+  if (t.start_date) {
+    const today = new Date().toISOString().slice(0, 10);
+    if (t.start_date < today) return { key: "delayed", label: "지연" };
+  }
+  return { key: "todo", label: "예정" };
+}
+
 // ---------- entry (no password gate: anyone with the link can edit) ----------
 function getProjectIdFromUrl() {
   return new URLSearchParams(location.search).get("p");
@@ -342,7 +353,9 @@ function escapeHtml(s) {
 function renderTable() {
   const tbody = $("#taskTbody");
   const dis = !state.editMode ? "disabled" : "";
-  tbody.innerHTML = state.tasks.map((t, idx) => `
+  tbody.innerHTML = state.tasks.map((t, idx) => {
+    const ts = deriveTaskStatus(t);
+    return `
     <tr draggable="${state.editMode}" data-id="${t.id}">
       <td class="col-drag"><span class="drag-handle">⠿</span></td>
       <td class="col-color"><button type="button" class="color-swatch-btn" style="background:${t.phase_color}" data-action="color" data-id="${t.id}" title="클릭하면 색상을 바꿀 수 있어요" ${dis}></button></td>
@@ -350,6 +363,7 @@ function renderTable() {
         <input value="${escapeHtml(t.phase_name)}" data-field="phase_name" data-id="${t.id}" ${dis}>
       </span></td>
       <td><input value="${escapeHtml(t.name)}" data-field="name" data-id="${t.id}" ${dis} placeholder="업무명"></td>
+      <td class="col-taskstatus"><span class="task-status-badge ${ts.key}">${ts.label}</span></td>
       <td><input value="${escapeHtml(t.owner)}" data-field="owner" data-id="${t.id}" ${dis} placeholder="담당자"></td>
       <td><input type="date" value="${t.start_date || ""}" data-field="start_date" data-id="${t.id}" ${dis}></td>
       <td><input type="date" value="${t.end_date || ""}" data-field="end_date" data-id="${t.id}" ${dis}></td>
@@ -362,7 +376,8 @@ function renderTable() {
       <td><input value="${escapeHtml(t.note)}" data-field="note" data-id="${t.id}" ${dis} placeholder="-"></td>
       <td class="col-del">${state.editMode ? `<button class="del-btn" data-action="del" data-id="${t.id}">✕</button>` : ""}</td>
     </tr>
-  `).join("");
+  `;
+  }).join("");
 
   tbody.querySelectorAll("input,select").forEach(el => {
     el.addEventListener("change", () => updateTaskField(el.dataset.id, el.dataset.field, el.value));
@@ -453,10 +468,18 @@ function buildGanttHtml(tasks, daypx) {
     if (!t.start_date || !t.end_date) return;
     const off = daysBetween(minDate, t.start_date);
     const len = Math.max(1, daysBetween(t.start_date, t.end_date) + 1);
+    const ts = deriveTaskStatus(t);
+    let barColor = t.phase_color;
+    if (ts.key === "delayed") barColor = "var(--critical)";
+    else if (ts.key === "done") barColor = "var(--ink-muted)";
+    const barLeft = off * daypx;
+    const barWidth = len * daypx - 3;
+    const labelHtml = ts.key === "todo" ? "" : `<span class="gantt-bar-status ${ts.key}" style="left:${barLeft + barWidth + 6}px">${ts.label}</span>`;
     html += `<div class="gantt-row" style="grid-template-columns:${GANTT_LABEL_W}px 1fr;width:${rowWidth}px">
       <div class="gantt-row-label">${escapeHtml(t.name || "(제목 없음)")}</div>
       <div class="gantt-track" style="width:${trackWidth}px">
-        <div class="gantt-bar" style="left:${off * daypx}px;width:${len * daypx - 3}px;background:${t.phase_color}" title="${escapeHtml(t.name)}"></div>
+        <div class="gantt-bar ${ts.key}" style="left:${barLeft}px;width:${barWidth}px;background:${barColor}" title="${escapeHtml(t.name)}"></div>
+        ${labelHtml}
       </div>
     </div>`;
   });
@@ -466,12 +489,15 @@ function buildGanttHtml(tasks, daypx) {
 function renderCards() {
   const list = $("#cardList");
   const dis = !state.editMode ? "disabled" : "";
-  list.innerHTML = state.tasks.map((t, idx) => `
+  list.innerHTML = state.tasks.map((t, idx) => {
+    const ts = deriveTaskStatus(t);
+    return `
     <div class="task-card" data-id="${t.id}">
       <div class="card-top">
         <span class="phase-pill" style="background:${t.phase_color}" data-action="color" data-id="${t.id}" title="클릭하면 색상을 바꿀 수 있어요">
           <input value="${escapeHtml(t.phase_name)}" data-field="phase_name" data-id="${t.id}" ${dis}>
         </span>
+        <span class="task-status-badge ${ts.key}">${ts.label}</span>
         ${state.editMode ? `<div class="move-btns">
           <button class="icon-btn" data-action="up" data-id="${t.id}" ${idx === 0 ? "disabled" : ""}>▲</button>
           <button class="icon-btn" data-action="down" data-id="${t.id}" ${idx === state.tasks.length - 1 ? "disabled" : ""}>▼</button>
@@ -498,7 +524,8 @@ function renderCards() {
         <div class="card-field"><label>비고</label><input value="${escapeHtml(t.note)}" data-field="note" data-id="${t.id}" ${dis}></div>
       </div>
     </div>
-  `).join("");
+  `;
+  }).join("");
 
   list.querySelectorAll("input,select").forEach(el => {
     el.addEventListener("change", () => updateTaskField(el.dataset.id, el.dataset.field, el.value));

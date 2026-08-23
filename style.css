@@ -129,6 +129,11 @@ h1.title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; font
 .color-swatch-btn:hover { box-shadow: 0 0 0 2px var(--accent); transform: scale(1.1); }
 .color-swatch-btn:disabled { cursor: default; }
 .color-swatch-btn:disabled:hover { box-shadow: 0 0 0 1.5px var(--border-strong); transform: none; }
+.col-taskstatus { width: 76px; text-align: center; }
+.task-status-badge { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: var(--surface-alt); color: var(--ink-2); border: 1px solid var(--border); white-space: nowrap; }
+.task-status-badge.delayed { background: rgba(208,59,59,0.14); color: var(--critical); border-color: transparent; }
+.task-status-badge.doing { background: rgba(31,111,83,0.14); color: var(--accent); border-color: transparent; }
+.task-status-badge.done { background: rgba(139,148,139,0.18); color: var(--ink-muted); border-color: transparent; }
 .status-select { font-weight: 700; }
 .status-select[data-status="done"] { color: var(--good); }
 .status-select[data-status="doing"] { color: var(--accent-warm); }
@@ -143,7 +148,12 @@ h1.title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; font
 .gantt-row { display: grid; align-items: center; height: 30px; position: relative; border-bottom: 1px solid var(--border); }
 .gantt-row-label { position: sticky; left: 0; background: var(--surface); padding-right: 10px; font-size: 12px; white-space: nowrap; z-index: 2; border-right: 1px solid var(--border-strong); box-sizing: border-box; overflow: hidden; text-overflow: ellipsis; }
 .gantt-track { position: relative; height: 100%; }
-.gantt-bar { position: absolute; top: 5px; height: 20px; border-radius: 6px; }
+.gantt-bar { position: absolute; top: 5px; height: 20px; border-radius: 6px; box-sizing: border-box; }
+.gantt-bar.doing { border: 2px solid var(--good); }
+.gantt-bar-status { position: absolute; top: 50%; transform: translateY(-50%); font-size: 10.5px; font-weight: 700; white-space: nowrap; }
+.gantt-bar-status.doing { color: var(--good); }
+.gantt-bar-status.delayed { color: var(--critical); }
+.gantt-bar-status.done { color: var(--ink-muted); }
 .gantt-spacer { flex: none; width: 160px; position: sticky; left: 0; background: var(--surface); z-index: 3; border-right: 1px solid var(--border-strong); box-sizing: border-box; }
 .gantt-month-row { display: flex; font-size: 11.5px; font-weight: 700; color: var(--ink-2); border-bottom: 1px solid var(--border); padding-bottom: 4px; margin-bottom: 2px; }
 .gantt-month-track { display: flex; flex: none; }
