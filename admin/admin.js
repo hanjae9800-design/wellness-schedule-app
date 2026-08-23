@@ -126,27 +126,4 @@ function wireUI() {
   });
 }
 
-// ---------- admin password gate ----------
-function initGate() {
-  if (sessionStorage.getItem("admin_unlocked") === "1") {
-    enterAdmin();
-    return;
-  }
-  const tryUnlock = () => {
-    if ($("#gatePassword").value === cfg.ADMIN_PASSWORD) {
-      sessionStorage.setItem("admin_unlocked", "1");
-      enterAdmin();
-    } else {
-      $("#gateError").textContent = "비밀번호가 올바르지 않습니다.";
-    }
-  };
-  $("#gateSubmit").addEventListener("click", tryUnlock);
-  $("#gatePassword").addEventListener("keydown", (e) => { if (e.key === "Enter") tryUnlock(); });
-}
-function enterAdmin() {
-  $("#gate").hidden = true;
-  $("#loadingVeil").hidden = false;
-  boot();
-}
-
-initGate();
+boot();
