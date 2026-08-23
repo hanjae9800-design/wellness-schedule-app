@@ -150,7 +150,6 @@ h1.title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; font
 .gantt-row-name { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gantt-track { position: relative; height: 100%; }
 .gantt-bar { position: absolute; top: 10px; height: 20px; border-radius: 6px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 0 3px; }
-.gantt-bar.doing { border: 2px solid var(--good); }
 .gantt-bar-label { font-size: 10px; font-weight: 700; color: #fff; white-space: nowrap; text-shadow: 0 1px 1px rgba(0,0,0,0.3); pointer-events: none; }
 .gantt-spacer { flex: none; width: 160px; position: sticky; left: 0; background: var(--surface); z-index: 3; border-right: 1px solid var(--border-strong); box-sizing: border-box; }
 .gantt-resizer { position: absolute; top: 0; right: -5px; width: 10px; height: 100%; cursor: col-resize; user-select: none; z-index: 6; }

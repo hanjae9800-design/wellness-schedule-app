@@ -510,6 +510,7 @@ function buildGanttHtml(tasks, daypx) {
     let barColor = t.phase_color;
     if (ts.key === "delayed") barColor = "var(--delay)";
     else if (ts.key === "done") barColor = "var(--ink-muted)";
+    else if (ts.key === "doing") barColor = "var(--accent)";
     const barLeft = off * daypx;
     const barWidth = len * daypx - 3;
     const labelHtml = ts.key === "todo" ? "" : `<span class="gantt-bar-label">${ts.label}</span>`;
