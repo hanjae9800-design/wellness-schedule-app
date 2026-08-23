@@ -160,7 +160,6 @@ h1.title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; font
 
 /* ---- color picker ---- */
 .color-picker { position: fixed; z-index: 200; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 12px; box-shadow: var(--shadow); padding: 10px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
-.color-picker-title { grid-column: 1 / -1; font-size: 11.5px; font-weight: 700; color: var(--ink-muted); margin-bottom: 2px; }
 .color-swatch { width: 26px; height: 26px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; }
 .color-swatch.selected { border-color: var(--ink); }
 

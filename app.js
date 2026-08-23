@@ -345,10 +345,10 @@ function renderTable() {
   tbody.innerHTML = state.tasks.map((t, idx) => `
     <tr draggable="${state.editMode}" data-id="${t.id}">
       <td class="col-drag"><span class="drag-handle">⠿</span></td>
+      <td class="col-color"><button type="button" class="color-swatch-btn" style="background:${t.phase_color}" data-action="color" data-id="${t.id}" title="클릭하면 색상을 바꿀 수 있어요" ${dis}></button></td>
       <td class="col-phase"><span class="phase-pill" style="background:${t.phase_color}">
         <input value="${escapeHtml(t.phase_name)}" data-field="phase_name" data-id="${t.id}" ${dis}>
       </span></td>
-      <td class="col-color"><button type="button" class="color-swatch-btn" style="background:${t.phase_color}" data-action="color" data-id="${t.id}" title="클릭하면 색상을 바꿀 수 있어요" ${dis}></button></td>
       <td><input value="${escapeHtml(t.name)}" data-field="name" data-id="${t.id}" ${dis} placeholder="업무명"></td>
       <td><input value="${escapeHtml(t.owner)}" data-field="owner" data-id="${t.id}" ${dis} placeholder="담당자"></td>
       <td><input type="date" value="${t.start_date || ""}" data-field="start_date" data-id="${t.id}" ${dis}></td>
@@ -484,14 +484,13 @@ function renderCards() {
 function openColorPicker(anchorEl, taskId) {
   const picker = $("#colorPicker");
   const rect = anchorEl.getBoundingClientRect();
-  const pickerHeight = 210;
+  const pickerHeight = 190;
   let top = rect.bottom + 6;
   if (top + pickerHeight > window.innerHeight) top = Math.max(8, rect.top - pickerHeight - 6);
   picker.style.top = top + "px";
   picker.style.left = Math.min(rect.left, window.innerWidth - 220) + "px";
   const current = state.tasks.find(t => t.id === taskId)?.phase_color;
-  picker.innerHTML = `<div class="color-picker-title">색상 변경</div>` +
-    PALETTE.map(c => `<span class="color-swatch ${c === current ? "selected" : ""}" style="background:${c}" data-color="${c}"></span>`).join("");
+  picker.innerHTML = PALETTE.map(c => `<span class="color-swatch ${c === current ? "selected" : ""}" style="background:${c}" data-color="${c}"></span>`).join("");
   picker.hidden = false;
   picker.querySelectorAll(".color-swatch").forEach(sw => {
     sw.addEventListener("click", () => {
