@@ -103,6 +103,20 @@
   <div class="color-picker" id="colorPicker" hidden></div>
 </div>
 
+<button id="feedbackFab" class="feedback-fab" type="button">💬 불편사항 제보</button>
+<div class="feedback-modal" id="feedbackModal" hidden>
+  <div class="feedback-modal-box">
+    <h2>불편사항 제보</h2>
+    <p class="feedback-modal-sub">버그나 불편한 점을 적어주시면 확인 후 개선하겠습니다.</p>
+    <textarea id="feedbackText" rows="4" placeholder="예: 모바일에서 날짜 입력이 안 눌려요"></textarea>
+    <div class="feedback-modal-actions">
+      <button class="secondary" id="feedbackCancelBtn" type="button">취소</button>
+      <button class="primary" id="feedbackSubmitBtn" type="button">제출</button>
+    </div>
+    <p class="feedback-modal-status" id="feedbackStatus" hidden></p>
+  </div>
+</div>
+
 <script src="config.js"></script>
 <script type="module" src="app.js"></script>
 </body>
