@@ -21,6 +21,21 @@ function daysBetween(a, b) {
   return Math.round((new Date(b) - new Date(a)) / 86400000);
 }
 
+// ---------- project-level status (예정 / 지연 / 진행중 / 완료) ----------
+function deriveProjectStatusFromMinStart(status, minStart) {
+  if (status === "doing") return { key: "doing", label: "진행중" };
+  if (status === "done") return { key: "done", label: "완료" };
+  if (!minStart) return { key: "todo", label: "예정" };
+  const today = new Date().toISOString().slice(0, 10);
+  if (minStart < today) return { key: "delayed", label: "지연" };
+  return { key: "todo", label: "예정" };
+}
+function deriveProjectStatus(status, tasks) {
+  const dated = (tasks || []).filter(t => t.start_date);
+  const minStart = dated.length ? dated.reduce((m, t) => t.start_date < m ? t.start_date : m, dated[0].start_date) : null;
+  return deriveProjectStatusFromMinStart(status, minStart);
+}
+
 // ---------- entry (no password gate: anyone with the link can edit) ----------
 function getProjectIdFromUrl() {
   return new URLSearchParams(location.search).get("p");
@@ -63,13 +78,15 @@ async function enterLanding() {
   $("#landing").hidden = false;
 }
 async function loadLandingProgress() {
-  const { data, error } = await supabase.from("tasks").select("project_id, status");
+  const { data, error } = await supabase.from("tasks").select("project_id, status, start_date");
   if (error) { console.error(error); landingProgress = {}; return; }
   const stats = {};
   (data || []).forEach(t => {
-    if (!stats[t.project_id]) stats[t.project_id] = { total: 0, done: 0 };
-    stats[t.project_id].total += 1;
-    if (t.status === "done") stats[t.project_id].done += 1;
+    if (!stats[t.project_id]) stats[t.project_id] = { total: 0, done: 0, minStart: null };
+    const s = stats[t.project_id];
+    s.total += 1;
+    if (t.status === "done") s.done += 1;
+    if (t.start_date && (!s.minStart || t.start_date < s.minStart)) s.minStart = t.start_date;
   });
   landingProgress = stats;
 }
@@ -83,13 +100,14 @@ function renderLanding() {
       const total = prog ? prog.total : 0;
       const done = prog ? prog.done : 0;
       const pct = total ? Math.round(done / total * 100) : 0;
+      const st = deriveProjectStatusFromMinStart(p.status || "todo", prog ? prog.minStart : null);
       return `
       <div class="project-card" data-id="${p.id}">
         <label class="pc-check"><input type="checkbox" class="pc-checkbox" data-id="${p.id}" ${selectedProjectIds.has(p.id) ? "checked" : ""}></label>
         <a class="pc-body" href="?p=${p.id}">
           <div class="pc-eyebrow">${escapeHtml(p.org || "")}${p.dept ? " / " + escapeHtml(p.dept) : ""}${p.pm ? " / PM " + escapeHtml(p.pm) : ""}</div>
           <div class="pc-name">${escapeHtml(p.name || "(제목 없음)")} 추진일정</div>
-          <div class="pc-meta">생성일 ${p.created_at ? p.created_at.slice(0, 10) : ""} · <span class="pc-mode ${p.mode === "edit" ? "edit" : ""}">${p.mode === "edit" ? "✏️ 편집 가능" : "🔒 보기 전용"}</span></div>
+          <div class="pc-meta">생성일 ${p.created_at ? p.created_at.slice(0, 10) : ""} · <span class="proj-status-badge ${st.key}">${st.label}</span> · <span class="pc-mode ${p.mode === "edit" ? "edit" : ""}">${p.mode === "edit" ? "✏️ 편집 가능" : "🔒 보기 전용"}</span></div>
           <div class="pc-progress">
             <div class="pc-progress-bar"><div class="pc-progress-fill" style="width:${pct}%"></div></div>
             <span class="pc-progress-label">${total ? `${pct}% (${done}/${total})` : "업무 없음"}</span>
@@ -140,7 +158,7 @@ function wireLandingUI() {
     const pm = $("#newPmInput").value.trim();
     const name = $("#newNameInput").value.trim();
     if (!name) { $("#newNameInput").focus(); return; }
-    const { data, error } = await supabase.from("projects").insert({ org, dept, pm, name, mode: "view" }).select().single();
+    const { data, error } = await supabase.from("projects").insert({ org, dept, pm, name, mode: "view", status: "todo" }).select().single();
     if (error) { console.error(error); return; }
     location.href = "?p=" + data.id;
   });
@@ -293,6 +311,12 @@ function renderHeader() {
   $("#deptInput").disabled = disabled;
   $("#pmInput").disabled = disabled;
   $("#projNameInput").disabled = disabled;
+  const st = deriveProjectStatus(p.status || "todo", state.tasks);
+  const badge = $("#statusBadge");
+  badge.textContent = st.label;
+  badge.className = "proj-status-badge " + st.key;
+  $("#statusSelect").value = p.status || "todo";
+  $("#statusSelect").disabled = disabled;
 }
 function renderStats() {
   const total = state.tasks.length;
@@ -482,6 +506,10 @@ function wireStaticUI() {
   $("#deptInput").addEventListener("change", () => updateProjectField("dept", $("#deptInput").value));
   $("#pmInput").addEventListener("change", () => updateProjectField("pm", $("#pmInput").value));
   $("#projNameInput").addEventListener("change", () => updateProjectField("name", $("#projNameInput").value));
+  $("#statusSelect").addEventListener("change", () => {
+    updateProjectField("status", $("#statusSelect").value);
+    renderHeader();
+  });
   $("#addTaskBtnDesktop").addEventListener("click", addTask);
   $("#addTaskBtnMobile").addEventListener("click", addTask);
   $("#addTaskBtnDesktop").hidden = !state.editMode;
