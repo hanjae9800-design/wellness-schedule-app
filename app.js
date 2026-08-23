@@ -58,31 +58,26 @@ function taskMatchesFilters(t) {
   return true;
 }
 function renderFilterOptions() {
-  const phaseSel = $("#filterPhase");
-  const ownerSel = $("#filterOwner");
   const phases = [...new Set(state.tasks.map(t => (t.phase_name || "").trim()).filter(Boolean))];
   const owners = [...new Set(state.tasks.map(t => (t.owner || "").trim()).filter(Boolean))];
-  phaseSel.innerHTML = `<option value="">전체 구분</option>` + phases.map(name => `<option value="${escapeHtml(name)}" ${taskFilters.phase === name ? "selected" : ""}>${escapeHtml(name)}</option>`).join("");
-  ownerSel.innerHTML = `<option value="">전체 담당자</option>` + owners.map(name => `<option value="${escapeHtml(name)}" ${taskFilters.owner === name ? "selected" : ""}>${escapeHtml(name)}</option>`).join("");
-  if (taskFilters.phase && !phases.includes(taskFilters.phase)) { taskFilters.phase = ""; phaseSel.value = ""; }
-  if (taskFilters.owner && !owners.includes(taskFilters.owner)) { taskFilters.owner = ""; ownerSel.value = ""; }
-  $("#filterStatus").value = taskFilters.status;
+  if (taskFilters.phase && !phases.includes(taskFilters.phase)) taskFilters.phase = "";
+  if (taskFilters.owner && !owners.includes(taskFilters.owner)) taskFilters.owner = "";
+
+  const phaseHtml = `<option value="">구분 ▾</option>` + phases.map(name => `<option value="${escapeHtml(name)}" ${taskFilters.phase === name ? "selected" : ""}>${escapeHtml(name)}</option>`).join("");
+  const ownerHtml = `<option value="">담당자 ▾</option>` + owners.map(name => `<option value="${escapeHtml(name)}" ${taskFilters.owner === name ? "selected" : ""}>${escapeHtml(name)}</option>`).join("");
+  ["#filterPhase", "#filterPhaseMobile"].forEach(sel => { $(sel).innerHTML = phaseHtml; });
+  ["#filterOwner", "#filterOwnerMobile"].forEach(sel => { $(sel).innerHTML = ownerHtml; });
+  ["#filterStatus", "#filterStatusMobile"].forEach(sel => { $(sel).value = taskFilters.status; });
 }
 function applyTaskFilters() {
-  let visible = 0;
   $$("#taskTbody tr").forEach(row => {
     const t = state.tasks.find(x => x.id === row.dataset.id);
-    const match = !!t && taskMatchesFilters(t);
-    row.hidden = !match;
-    if (match) visible++;
+    row.hidden = !(t && taskMatchesFilters(t));
   });
   $$("#cardList .task-card").forEach(card => {
     const t = state.tasks.find(x => x.id === card.dataset.id);
     card.hidden = !(t && taskMatchesFilters(t));
   });
-  const active = !!(taskFilters.phase || taskFilters.status || taskFilters.owner);
-  $("#filterResetBtn").hidden = !active;
-  $("#filterCount").textContent = active ? `${visible} / ${state.tasks.length}개 표시` : "";
 }
 function getAssigneeOptions() {
   const p = state.project;
@@ -757,14 +752,18 @@ function wireColumnResize() {
 
 // ---------- mobile gantt overlay ----------
 function wireStaticUI() {
-  $("#filterPhase").addEventListener("change", () => { taskFilters.phase = $("#filterPhase").value; applyTaskFilters(); });
-  $("#filterStatus").addEventListener("change", () => { taskFilters.status = $("#filterStatus").value; applyTaskFilters(); });
-  $("#filterOwner").addEventListener("change", () => { taskFilters.owner = $("#filterOwner").value; applyTaskFilters(); });
-  $("#filterResetBtn").addEventListener("click", () => {
-    taskFilters = { phase: "", status: "", owner: "" };
-    renderFilterOptions();
-    applyTaskFilters();
-  });
+  const wireFilterPair = (key, ids) => {
+    ids.forEach(id => {
+      $(id).addEventListener("change", () => {
+        taskFilters[key] = $(id).value;
+        ids.forEach(otherId => { if (otherId !== id) $(otherId).value = taskFilters[key]; });
+        applyTaskFilters();
+      });
+    });
+  };
+  wireFilterPair("phase", ["#filterPhase", "#filterPhaseMobile"]);
+  wireFilterPair("status", ["#filterStatus", "#filterStatusMobile"]);
+  wireFilterPair("owner", ["#filterOwner", "#filterOwnerMobile"]);
   $("#orgInput").addEventListener("change", () => updateProjectField("org", $("#orgInput").value));
   $("#deptInput").addEventListener("change", () => updateProjectField("dept", $("#deptInput").value));
   $("#pmInput").addEventListener("change", () => {
