@@ -69,7 +69,7 @@ function renderLanding() {
       <div class="project-card" data-id="${p.id}">
         <label class="pc-check"><input type="checkbox" class="pc-checkbox" data-id="${p.id}" ${selectedProjectIds.has(p.id) ? "checked" : ""}></label>
         <a class="pc-body" href="?p=${p.id}">
-          <div class="pc-eyebrow">${escapeHtml(p.org || "")}${p.dept ? " / " + escapeHtml(p.dept) : ""}</div>
+          <div class="pc-eyebrow">${escapeHtml(p.org || "")}${p.dept ? " / " + escapeHtml(p.dept) : ""}${p.pm ? " / PM " + escapeHtml(p.pm) : ""}</div>
           <div class="pc-name">${escapeHtml(p.name || "(제목 없음)")} 추진일정</div>
           <div class="pc-meta">생성일 ${p.created_at ? p.created_at.slice(0, 10) : ""} · <span class="pc-mode ${p.mode === "edit" ? "edit" : ""}">${p.mode === "edit" ? "✏️ 편집 가능" : "🔒 보기 전용"}</span></div>
         </a>
@@ -114,9 +114,10 @@ function wireLandingUI() {
   $("#newProjectBtn").addEventListener("click", async () => {
     const org = $("#newOrgInput").value.trim();
     const dept = $("#newDeptInput").value.trim();
+    const pm = $("#newPmInput").value.trim();
     const name = $("#newNameInput").value.trim();
     if (!name) { $("#newNameInput").focus(); return; }
-    const { data, error } = await supabase.from("projects").insert({ org, dept, name, mode: "view" }).select().single();
+    const { data, error } = await supabase.from("projects").insert({ org, dept, pm, name, mode: "view" }).select().single();
     if (error) { console.error(error); return; }
     location.href = "?p=" + data.id;
   });
@@ -262,10 +263,12 @@ function renderHeader() {
   if (!p) return;
   $("#orgInput").value = p.org || "";
   $("#deptInput").value = p.dept || "";
+  $("#pmInput").value = p.pm || "";
   $("#projNameInput").value = p.name || "";
   const disabled = !state.editMode;
   $("#orgInput").disabled = disabled;
   $("#deptInput").disabled = disabled;
+  $("#pmInput").disabled = disabled;
   $("#projNameInput").disabled = disabled;
 }
 function renderStats() {
@@ -454,6 +457,7 @@ function openColorPicker(anchorEl, taskId) {
 function wireStaticUI() {
   $("#orgInput").addEventListener("change", () => updateProjectField("org", $("#orgInput").value));
   $("#deptInput").addEventListener("change", () => updateProjectField("dept", $("#deptInput").value));
+  $("#pmInput").addEventListener("change", () => updateProjectField("pm", $("#pmInput").value));
   $("#projNameInput").addEventListener("change", () => updateProjectField("name", $("#projNameInput").value));
   $("#addTaskBtnDesktop").addEventListener("click", addTask);
   $("#addTaskBtnMobile").addEventListener("click", addTask);
