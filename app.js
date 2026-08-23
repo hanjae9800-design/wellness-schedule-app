@@ -597,10 +597,16 @@ function applyGanttPanelSizing() {
   const ruler = ganttEl.querySelector(".gantt-ruler");
   const headerH = (monthRow ? monthRow.offsetHeight : 0) + (ruler ? ruler.offsetHeight : 0);
   const rowCount = ganttEl.querySelectorAll(".gantt-row").length;
-  const availableForRows = Math.max(0, ganttPanelHeight - headerH);
+
+  // The horizontal date scrollbar (from overflow-x: auto) eats into the
+  // wrap's own height, so it can cover the last row at the smallest size.
+  // Measure it and reserve that space before computing row height.
+  wrap.style.height = ganttPanelHeight + "px";
+  const scrollbarH = Math.max(0, wrap.offsetHeight - wrap.clientHeight);
+
+  const availableForRows = Math.max(0, ganttPanelHeight - headerH - scrollbarH);
   const rowH = rowCount ? Math.max(GANTT_ROW_MIN_H, Math.min(GANTT_ROW_DEFAULT_H, availableForRows / rowCount)) : GANTT_ROW_DEFAULT_H;
   ganttEl.style.setProperty("--gantt-row-h", rowH + "px");
-  wrap.style.height = ganttPanelHeight + "px";
 }
 function wireGanttVResizer() {
   const handle = $("#ganttVResizer");
