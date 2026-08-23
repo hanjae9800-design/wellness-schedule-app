@@ -441,4 +441,41 @@ function wireStaticUI() {
   $("#timelineCloseBtn").addEventListener("click", () => { $("#ganttOverlay").hidden = true; });
 }
 
+// ---------- feedback ----------
+function wireFeedbackUI() {
+  const modal = $("#feedbackModal");
+  const openModal = () => {
+    $("#feedbackText").value = "";
+    $("#feedbackStatus").hidden = true;
+    modal.hidden = false;
+    $("#feedbackText").focus();
+  };
+  const closeModal = () => { modal.hidden = true; };
+
+  $("#feedbackFab").addEventListener("click", openModal);
+  $("#feedbackCancelBtn").addEventListener("click", closeModal);
+  modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
+
+  $("#feedbackSubmitBtn").addEventListener("click", async () => {
+    const message = $("#feedbackText").value.trim();
+    if (!message) { $("#feedbackText").focus(); return; }
+    const statusEl = $("#feedbackStatus");
+    statusEl.hidden = false;
+    statusEl.textContent = "제출 중…";
+    const { error } = await supabase.from("feedback").insert({
+      project_id: state.project?.id || null,
+      message,
+      page_url: location.href
+    });
+    if (error) {
+      console.error(error);
+      statusEl.textContent = "제출 실패: " + error.message;
+      return;
+    }
+    statusEl.textContent = "제보해주셔서 감사합니다!";
+    setTimeout(closeModal, 1200);
+  });
+}
+
+wireFeedbackUI();
 initGate();
