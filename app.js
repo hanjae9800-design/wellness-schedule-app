@@ -63,8 +63,8 @@ function renderFilterOptions() {
   if (taskFilters.phase && !phases.includes(taskFilters.phase)) taskFilters.phase = "";
   if (taskFilters.owner && !owners.includes(taskFilters.owner)) taskFilters.owner = "";
 
-  const phaseHtml = `<option value="">구분 ▾</option>` + phases.map(name => `<option value="${escapeHtml(name)}" ${taskFilters.phase === name ? "selected" : ""}>${escapeHtml(name)}</option>`).join("");
-  const ownerHtml = `<option value="">담당자 ▾</option>` + owners.map(name => `<option value="${escapeHtml(name)}" ${taskFilters.owner === name ? "selected" : ""}>${escapeHtml(name)}</option>`).join("");
+  const phaseHtml = `<option value="">구분</option>` + phases.map(name => `<option value="${escapeHtml(name)}" ${taskFilters.phase === name ? "selected" : ""}>${escapeHtml(name)}</option>`).join("");
+  const ownerHtml = `<option value="">담당자</option>` + owners.map(name => `<option value="${escapeHtml(name)}" ${taskFilters.owner === name ? "selected" : ""}>${escapeHtml(name)}</option>`).join("");
   ["#filterPhase", "#filterPhaseMobile"].forEach(sel => { $(sel).innerHTML = phaseHtml; });
   ["#filterOwner", "#filterOwnerMobile"].forEach(sel => { $(sel).innerHTML = ownerHtml; });
   ["#filterStatus", "#filterStatusMobile"].forEach(sel => { $(sel).value = taskFilters.status; });
