@@ -124,7 +124,7 @@ h1.title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; font
 .phase-pill input { color: inherit; font-weight: inherit; padding: 0; background: transparent; border: none; width: auto; min-width: 40px; text-align: center; }
 .task-table .phase-pill { display: flex; justify-content: center; width: 100%; }
 .task-table .phase-pill input { width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.col-color { width: 38px; text-align: center; }
+.col-color { width: 38px; text-align: center; background: var(--surface-alt); border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
 .color-swatch-btn { width: 24px; height: 24px; border-radius: 999px; border: 2px solid var(--surface); box-shadow: 0 0 0 1.5px var(--border-strong); cursor: pointer; padding: 0; transition: transform .1s ease, box-shadow .1s ease; }
 .color-swatch-btn:hover { box-shadow: 0 0 0 2px var(--accent); transform: scale(1.1); }
 .color-swatch-btn:disabled { cursor: default; }
@@ -160,6 +160,7 @@ h1.title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; font
 
 /* ---- color picker ---- */
 .color-picker { position: fixed; z-index: 200; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 12px; box-shadow: var(--shadow); padding: 10px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.color-picker-title { grid-column: 1 / -1; font-size: 11.5px; font-weight: 700; color: var(--ink-muted); margin-bottom: 2px; }
 .color-swatch { width: 26px; height: 26px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; }
 .color-swatch.selected { border-color: var(--ink); }
 
