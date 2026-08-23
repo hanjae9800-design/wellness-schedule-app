@@ -429,8 +429,36 @@ function renderGantt() {
   const wrap = $("#gantt");
   if (!state.tasks.length) { wrap.innerHTML = `<div style="color:var(--ink-muted);font-size:12px;padding:10px;">일정을 추가하면 타임라인이 표시됩니다.</div>`; return; }
   wrap.innerHTML = buildGanttHtml(state.tasks, DAYPX);
+  wireGanttResizer();
 }
-const GANTT_LABEL_W = 160;
+function loadGanttLabelWidth() {
+  const v = parseInt(localStorage.getItem("ganttLabelWidth") || "", 10);
+  return Number.isFinite(v) && v >= 100 && v <= 400 ? v : 160;
+}
+let ganttLabelWidth = loadGanttLabelWidth();
+function wireGanttResizer() {
+  const handle = $("#ganttResizer");
+  if (!handle) return;
+  handle.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = ganttLabelWidth;
+    handle.classList.add("active");
+    document.body.style.cursor = "col-resize";
+    const onMove = (ev) => {
+      ganttLabelWidth = Math.max(100, Math.min(400, Math.round(startWidth + (ev.clientX - startX))));
+      renderGantt();
+    };
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      try { localStorage.setItem("ganttLabelWidth", String(ganttLabelWidth)); } catch (e) {}
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  });
+}
 function buildGanttMonthSegments(minDate, totalDays) {
   const segments = [];
   let cur = new Date(minDate);
@@ -454,11 +482,11 @@ function buildGanttHtml(tasks, daypx) {
   const maxDate = dated.reduce((m, t) => t.end_date > m ? t.end_date : m, dated[0].end_date);
   const totalDays = Math.max(1, daysBetween(minDate, maxDate) + 1);
   const trackWidth = totalDays * daypx;
-  const rowWidth = GANTT_LABEL_W + trackWidth;
+  const rowWidth = ganttLabelWidth + trackWidth;
 
   const monthSegments = buildGanttMonthSegments(minDate, totalDays);
   let html = `<div class="gantt-month-row" style="width:${rowWidth}px">
-    <div class="gantt-spacer"></div>
+    <div class="gantt-spacer" style="width:${ganttLabelWidth}px"><div class="gantt-resizer" id="ganttResizer" title="드래그해서 업무명 폭 조정"></div></div>
     <div class="gantt-month-track" style="width:${trackWidth}px">
       ${monthSegments.map(s => `<span style="width:${s.days * daypx}px">${s.label}</span>`).join("")}
     </div>
@@ -467,7 +495,7 @@ function buildGanttHtml(tasks, daypx) {
   const rulerCols = [];
   for (let i = 0; i <= totalDays; i += 7) rulerCols.push(i);
   html += `<div class="gantt-ruler" style="width:${rowWidth}px">
-    <div class="gantt-spacer"></div>
+    <div class="gantt-spacer" style="width:${ganttLabelWidth}px"></div>
     <div class="gantt-ruler-track" style="width:${trackWidth}px">
       ${rulerCols.map(d => {
         const dt = new Date(minDate); dt.setDate(dt.getDate() + d);
@@ -487,7 +515,7 @@ function buildGanttHtml(tasks, daypx) {
     const barLeft = off * daypx;
     const barWidth = len * daypx - 3;
     const labelHtml = ts.key === "todo" ? "" : `<span class="gantt-bar-label">${ts.label}</span>`;
-    html += `<div class="gantt-row" style="grid-template-columns:${GANTT_LABEL_W}px 1fr;width:${rowWidth}px">
+    html += `<div class="gantt-row" style="grid-template-columns:${ganttLabelWidth}px 1fr;width:${rowWidth}px">
       <div class="gantt-row-label">
         <div class="gantt-row-phase"><span class="gantt-row-phase-dot" style="background:${t.phase_color}"></span>${escapeHtml(t.phase_name || "구분")}</div>
         <div class="gantt-row-name">${escapeHtml(t.name || "(제목 없음)")}</div>
@@ -501,7 +529,7 @@ function buildGanttHtml(tasks, daypx) {
   const todayStr = new Date().toISOString().slice(0, 10);
   const todayOffsetDays = daysBetween(minDate, todayStr);
   if (todayOffsetDays >= 0 && todayOffsetDays <= totalDays) {
-    const todayLeft = GANTT_LABEL_W + todayOffsetDays * daypx;
+    const todayLeft = ganttLabelWidth + todayOffsetDays * daypx;
     html += `<div class="gantt-today-line" style="left:${todayLeft}px"><span class="gantt-today-label">오늘</span></div>`;
   }
   return html;
