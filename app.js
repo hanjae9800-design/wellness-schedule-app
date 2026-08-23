@@ -3,7 +3,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const cfg = window.APP_CONFIG;
 const supabase = createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
-const PALETTE = Array.from({ length: 30 }, (_, i) => getComputedStyle(document.documentElement).getPropertyValue(`--p${i + 1}`).trim());
+// 진행중(초록)/지연(빨강)/완료(회색) 상태 색상과 헷갈릴 수 있는 팔레트 색은 선택지에서 제외합니다.
+const STATUS_LIKE_COLORS = new Set(["#16a34a", "#15803d", "#dc2626", "#65a30d", "#b91c1c", "#059669", "#475569", "#e11d48"]);
+const PALETTE = Array.from({ length: 30 }, (_, i) => getComputedStyle(document.documentElement).getPropertyValue(`--p${i + 1}`).trim())
+  .filter(c => !STATUS_LIKE_COLORS.has(c.toLowerCase()));
 const STATUS_LABEL = { todo: "예정", doing: "진행중", done: "완료" };
 const DAYPX = 20;
 
@@ -485,7 +488,10 @@ function buildGanttHtml(tasks, daypx) {
     const barWidth = len * daypx - 3;
     const labelHtml = ts.key === "todo" ? "" : `<span class="gantt-bar-label">${ts.label}</span>`;
     html += `<div class="gantt-row" style="grid-template-columns:${GANTT_LABEL_W}px 1fr;width:${rowWidth}px">
-      <div class="gantt-row-label">${escapeHtml(t.name || "(제목 없음)")}</div>
+      <div class="gantt-row-label">
+        <div class="gantt-row-phase"><span class="gantt-row-phase-dot" style="background:${t.phase_color}"></span>${escapeHtml(t.phase_name || "구분")}</div>
+        <div class="gantt-row-name">${escapeHtml(t.name || "(제목 없음)")}</div>
+      </div>
       <div class="gantt-track" style="width:${trackWidth}px">
         <div class="gantt-bar ${ts.key}" style="left:${barLeft}px;width:${barWidth}px;background:${barColor}" title="${escapeHtml(t.name)}">${labelHtml}</div>
       </div>
