@@ -510,7 +510,7 @@ function buildGanttHtml(tasks, daypx) {
     const len = Math.max(1, daysBetween(t.start_date, t.end_date) + 1);
     const ts = deriveTaskStatus(t);
     let barColor = t.phase_color;
-    if (ts.key === "delayed") barColor = "var(--critical)";
+    if (ts.key === "delayed") barColor = "var(--delay)";
     else if (ts.key === "done") barColor = "var(--ink-muted)";
     const barLeft = off * daypx;
     const barWidth = len * daypx - 3;
