@@ -10,7 +10,17 @@
 </head>
 <body>
 
-<div class="loading-veil" id="loadingVeil">불러오는 중…</div>
+<div class="gate" id="gate">
+  <div class="gate-box">
+    <h1>관리자</h1>
+    <p>관리자 비밀번호를 입력해주세요</p>
+    <input type="password" id="gatePassword" placeholder="비밀번호" autocomplete="current-password">
+    <button class="primary" id="gateSubmit">들어가기</button>
+    <div class="gate-error" id="gateError"></div>
+  </div>
+</div>
+
+<div class="loading-veil" id="loadingVeil" hidden>불러오는 중…</div>
 
 <div class="admin-wrap" id="app" hidden>
   <div class="admin-head">
