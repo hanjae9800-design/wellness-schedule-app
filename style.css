@@ -109,8 +109,10 @@ h1.title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; font
 .task-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
 .task-table th { position: relative; text-align: center; font-size: 11.5px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.04em; padding: 10px 10px; border-bottom: 1px solid var(--border-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .task-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; overflow: hidden; }
-.col-resizer { position: absolute; top: 0; right: -4px; width: 8px; height: 100%; cursor: col-resize; user-select: none; z-index: 3; }
-.col-resizer:hover, .col-resizer.active { background: var(--accent); opacity: .35; }
+.col-resizer { position: absolute; top: 0; right: -5px; width: 10px; height: 100%; cursor: col-resize; user-select: none; z-index: 3; }
+.col-resizer::after { content: ""; position: absolute; top: 20%; bottom: 20%; left: 50%; width: 3px; transform: translateX(-50%); background: var(--border-strong); border-radius: 3px; }
+.col-resizer:hover::after, .col-resizer.active::after { background: var(--accent); width: 4px; top: 10%; bottom: 10%; }
+.col-resizer:hover, .col-resizer.active { background: var(--accent); opacity: .18; }
 .task-table td.col-phase { text-align: center; }
 .task-table tr.dragging { opacity: 0.4; }
 .col-drag { width: 30px; }
@@ -118,8 +120,10 @@ h1.title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; font
 .task-table input, .task-table select, .task-table textarea { font: inherit; font-size: 12.5px; border: 1px solid transparent; background: transparent; color: var(--ink); padding: 4px 6px; border-radius: 6px; width: 100%; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
 .task-table input:hover, .task-table select:hover { border-color: var(--border); }
 .task-table input:focus, .task-table select:focus, .task-table textarea:focus { outline: none; border-color: var(--accent); background: var(--surface-alt); }
-.phase-pill { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; padding: 4px 8px; border-radius: 999px; color: #fff; font-weight: 700; font-size: 12px; }
+.phase-pill { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; padding: 4px 8px; border-radius: 999px; color: #fff; font-weight: 700; font-size: 12px; max-width: 100%; box-sizing: border-box; overflow: hidden; }
 .phase-pill input { color: inherit; font-weight: inherit; padding: 0; background: transparent; border: none; width: auto; min-width: 40px; text-align: center; }
+.task-table .phase-pill { display: flex; justify-content: center; width: 100%; }
+.task-table .phase-pill input { width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .status-select { font-weight: 700; }
 .status-select[data-status="done"] { color: var(--good); }
 .status-select[data-status="doing"] { color: var(--accent-warm); }
