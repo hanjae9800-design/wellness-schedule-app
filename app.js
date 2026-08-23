@@ -519,6 +519,62 @@ function renderGantt() {
   if (!state.tasks.length) { wrap.innerHTML = `<div style="color:var(--ink-muted);font-size:12px;padding:10px;">일정을 추가하면 타임라인이 표시됩니다.</div>`; return; }
   wrap.innerHTML = buildGanttHtml(state.tasks, DAYPX);
   wireGanttResizer();
+  applyGanttPanelSizing();
+}
+const GANTT_ROW_DEFAULT_H = 36;
+const GANTT_ROW_MIN_H = 22;
+function loadGanttPanelHeight() {
+  const v = parseInt(localStorage.getItem("ganttPanelHeight") || "", 10);
+  return Number.isFinite(v) && v > 0 ? v : null;
+}
+let ganttPanelHeight = loadGanttPanelHeight();
+function applyGanttPanelSizing() {
+  const wrap = $("#ganttWrap");
+  const ganttEl = $("#gantt");
+  if (!wrap || !ganttEl) return;
+  if (!ganttPanelHeight) {
+    wrap.style.height = "";
+    ganttEl.style.removeProperty("--gantt-row-h");
+    return;
+  }
+  const monthRow = ganttEl.querySelector(".gantt-month-row");
+  const ruler = ganttEl.querySelector(".gantt-ruler");
+  const headerH = (monthRow ? monthRow.offsetHeight : 0) + (ruler ? ruler.offsetHeight : 0);
+  const rowCount = ganttEl.querySelectorAll(".gantt-row").length;
+  const availableForRows = Math.max(0, ganttPanelHeight - headerH);
+  const rowH = rowCount ? Math.max(GANTT_ROW_MIN_H, Math.min(GANTT_ROW_DEFAULT_H, availableForRows / rowCount)) : GANTT_ROW_DEFAULT_H;
+  ganttEl.style.setProperty("--gantt-row-h", rowH + "px");
+  wrap.style.height = ganttPanelHeight + "px";
+}
+function wireGanttVResizer() {
+  const handle = $("#ganttVResizer");
+  if (!handle) return;
+  handle.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const wrap = $("#ganttWrap");
+    const startHeight = ganttPanelHeight || wrap.getBoundingClientRect().height;
+    handle.classList.add("active");
+    document.body.style.cursor = "row-resize";
+    const onMove = (ev) => {
+      ganttPanelHeight = Math.max(60, Math.round(startHeight + (ev.clientY - startY)));
+      applyGanttPanelSizing();
+    };
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      handle.classList.remove("active");
+      try { localStorage.setItem("ganttPanelHeight", String(ganttPanelHeight)); } catch (e) {}
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  });
+  handle.addEventListener("dblclick", () => {
+    ganttPanelHeight = null;
+    try { localStorage.removeItem("ganttPanelHeight"); } catch (e) {}
+    applyGanttPanelSizing();
+  });
 }
 function loadGanttLabelWidth() {
   const v = parseInt(localStorage.getItem("ganttLabelWidth") || "", 10);
@@ -607,10 +663,10 @@ function buildGanttHtml(tasks, daypx) {
     const labelHtml = ts.key === "todo" ? "" : `<span class="gantt-bar-label">${ts.label}</span>`;
     const ownerText = t.owner ? escapeHtml(t.owner) : "미배정";
     html += `<div class="gantt-row" style="grid-template-columns:${ganttLabelWidth}px 1fr;width:${rowWidth}px">
-      <div class="gantt-row-label">
-        <div class="gantt-row-phase"><span class="gantt-row-phase-dot" style="background:${t.phase_color}"></span>${escapeHtml(t.phase_name || "구분")}</div>
+      <div class="gantt-row-label" style="border-left:4px solid ${t.phase_color}">
         <div class="gantt-row-main">
-          <span class="gantt-row-name">${escapeHtml(t.name || "(제목 없음)")}</span>
+          <span class="gantt-row-phase-chip" style="background:${t.phase_color}">${escapeHtml(t.phase_name || "구분")}</span>
+          <span class="gantt-row-name" title="${escapeHtml(t.name || "")}">${escapeHtml(t.name || "(제목 없음)")}</span>
           <span class="gantt-row-owner">${ownerText}</span>
           <span class="task-status-badge ${ts.key}">${ts.label}</span>
         </div>
@@ -765,6 +821,7 @@ function wireColumnResize() {
 
 // ---------- mobile gantt overlay ----------
 function wireStaticUI() {
+  wireGanttVResizer();
   const wireFilterPair = (key, ids) => {
     ids.forEach(id => {
       $(id).addEventListener("change", () => {
