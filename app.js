@@ -603,8 +603,10 @@ function applyGanttPanelSizing() {
   // Measure it and reserve that space before computing row height.
   wrap.style.height = ganttPanelHeight + "px";
   const scrollbarH = Math.max(0, wrap.offsetHeight - wrap.clientHeight);
+  const cs = getComputedStyle(wrap);
+  const vPadding = parseFloat(cs.paddingTop || "0") + parseFloat(cs.paddingBottom || "0");
 
-  const availableForRows = Math.max(0, ganttPanelHeight - headerH - scrollbarH);
+  const availableForRows = Math.max(0, ganttPanelHeight - headerH - scrollbarH - vPadding);
   const rowH = rowCount ? Math.max(GANTT_ROW_MIN_H, Math.min(GANTT_ROW_DEFAULT_H, availableForRows / rowCount)) : GANTT_ROW_DEFAULT_H;
   ganttEl.style.setProperty("--gantt-row-h", rowH + "px");
 }
