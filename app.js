@@ -522,7 +522,7 @@ function renderGantt() {
 }
 function loadGanttLabelWidth() {
   const v = parseInt(localStorage.getItem("ganttLabelWidth") || "", 10);
-  return Number.isFinite(v) && v >= 100 && v <= 400 ? v : 160;
+  return Number.isFinite(v) && v >= 100 && v <= 400 ? v : 230;
 }
 let ganttLabelWidth = loadGanttLabelWidth();
 function wireGanttResizer() {
@@ -609,8 +609,11 @@ function buildGanttHtml(tasks, daypx) {
     html += `<div class="gantt-row" style="grid-template-columns:${ganttLabelWidth}px 1fr;width:${rowWidth}px">
       <div class="gantt-row-label">
         <div class="gantt-row-phase"><span class="gantt-row-phase-dot" style="background:${t.phase_color}"></span>${escapeHtml(t.phase_name || "구분")}</div>
-        <div class="gantt-row-name">${escapeHtml(t.name || "(제목 없음)")}</div>
-        <div class="gantt-row-meta"><span class="gantt-row-owner">${ownerText}</span><span class="task-status-badge ${ts.key}">${ts.label}</span></div>
+        <div class="gantt-row-main">
+          <span class="gantt-row-name">${escapeHtml(t.name || "(제목 없음)")}</span>
+          <span class="gantt-row-owner">${ownerText}</span>
+          <span class="task-status-badge ${ts.key}">${ts.label}</span>
+        </div>
       </div>
       <div class="gantt-track" style="width:${trackWidth}px">
         <div class="gantt-bar ${ts.key}" style="left:${barLeft}px;width:${barWidth}px;background:${barColor}" title="${escapeHtml(t.name)}">${labelHtml}</div>
