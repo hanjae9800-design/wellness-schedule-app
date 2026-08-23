@@ -502,7 +502,8 @@ function openColorPicker(anchorEl, taskId) {
 
 // ---------- task table column resize ----------
 const COL_WIDTH_KEY = "taskTableColWidths";
-const MIN_COL_WIDTH = 50;
+const COL_MIN_WIDTH = { phase: 64, name: 90, owner: 60, start: 104, end: 104, dep: 60, status: 70, note: 60 };
+const DEFAULT_MIN_COL_WIDTH = 50;
 function loadColWidths() {
   try { return JSON.parse(localStorage.getItem(COL_WIDTH_KEY) || "{}"); } catch (e) { return {}; }
 }
@@ -536,7 +537,8 @@ function wireColumnResize() {
   });
   document.addEventListener("mousemove", (e) => {
     if (!active) return;
-    const newWidth = Math.max(MIN_COL_WIDTH, Math.round(startWidth + (e.clientX - startX)));
+    const min = COL_MIN_WIDTH[active.key] || DEFAULT_MIN_COL_WIDTH;
+    const newWidth = Math.max(min, Math.round(startWidth + (e.clientX - startX)));
     active.col.style.width = newWidth + "px";
   });
   document.addEventListener("mouseup", () => {
