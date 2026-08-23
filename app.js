@@ -483,15 +483,21 @@ function buildGanttHtml(tasks, daypx) {
     else if (ts.key === "done") barColor = "var(--ink-muted)";
     const barLeft = off * daypx;
     const barWidth = len * daypx - 3;
-    const labelHtml = ts.key === "todo" ? "" : `<span class="gantt-bar-status ${ts.key}" style="left:${barLeft + barWidth + 6}px">${ts.label}</span>`;
+    const labelHtml = ts.key === "todo" ? "" : `<span class="gantt-bar-label">${ts.label}</span>`;
     html += `<div class="gantt-row" style="grid-template-columns:${GANTT_LABEL_W}px 1fr;width:${rowWidth}px">
       <div class="gantt-row-label">${escapeHtml(t.name || "(제목 없음)")}</div>
       <div class="gantt-track" style="width:${trackWidth}px">
-        <div class="gantt-bar ${ts.key}" style="left:${barLeft}px;width:${barWidth}px;background:${barColor}" title="${escapeHtml(t.name)}"></div>
-        ${labelHtml}
+        <div class="gantt-bar ${ts.key}" style="left:${barLeft}px;width:${barWidth}px;background:${barColor}" title="${escapeHtml(t.name)}">${labelHtml}</div>
       </div>
     </div>`;
   });
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayOffsetDays = daysBetween(minDate, todayStr);
+  if (todayOffsetDays >= 0 && todayOffsetDays <= totalDays) {
+    const todayLeft = GANTT_LABEL_W + todayOffsetDays * daypx;
+    html += `<div class="gantt-today-line" style="left:${todayLeft}px"><span class="gantt-today-label">오늘</span></div>`;
+  }
   return html;
 }
 
