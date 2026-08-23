@@ -22,25 +22,19 @@ function daysBetween(a, b) {
 }
 
 // ---------- entry (no password gate: anyone with the link can edit) ----------
-function initGate() {
-  state.editMode = true;
-  enterApp();
-}
-function enterApp() {
-  $("#app").hidden = false;
-  $("#modeBadge").textContent = "✏️ 편집 가능";
-  $("#modeBadge").classList.add("edit");
-  boot();
+function getProjectIdFromUrl() {
+  return new URLSearchParams(location.search).get("p");
 }
 
-// ---------- data load ----------
-async function boot() {
+async function initGate() {
+  state.editMode = true;
+  const pid = getProjectIdFromUrl();
   try {
-    await loadProject();
-    await loadTasks();
-    renderAll();
-    wireStaticUI();
-    subscribeRealtime();
+    if (pid) {
+      await enterProject(pid);
+    } else {
+      await enterLanding();
+    }
   } catch (e) {
     console.error(e);
     $("#loadingVeil").textContent = "불러오는 중 오류가 발생했습니다: " + (e?.message || e);
@@ -49,18 +43,57 @@ async function boot() {
   $("#loadingVeil").hidden = true;
 }
 
-async function loadProject() {
-  const { data, error } = await supabase.from("projects").select("*").limit(1);
-  if (error) { console.error(error); return; }
-  if (data && data.length) {
-    state.project = data[0];
-  } else {
-    const { data: created, error: insErr } = await supabase.from("projects").insert({
-      org: cfg.PROJECT_ORG || "", dept: "", name: cfg.PROJECT_NAME || ""
-    }).select().single();
-    if (insErr) { console.error(insErr); return; }
-    state.project = created;
+// ---------- landing (project list) ----------
+async function enterLanding() {
+  const { data, error } = await supabase.from("projects").select("*").order("created_at", { ascending: false });
+  if (error) throw error;
+  renderLanding(data || []);
+  wireLandingUI();
+  $("#landing").hidden = false;
+}
+function renderLanding(projects) {
+  const list = $("#projectList");
+  if (!projects.length) {
+    list.innerHTML = `<div class="empty-note">아직 만들어진 프로젝트가 없습니다. 아래에서 새로 만들어보세요.</div>`;
+    return;
   }
+  list.innerHTML = projects.map(p => `
+    <a class="project-card" href="?p=${p.id}">
+      <div class="pc-eyebrow">${escapeHtml(p.org || "")}${p.dept ? " / " + escapeHtml(p.dept) : ""}</div>
+      <div class="pc-name">${escapeHtml(p.name || "(제목 없음)")} 추진일정</div>
+      <div class="pc-meta">생성일 ${p.created_at ? p.created_at.slice(0, 10) : ""}</div>
+    </a>
+  `).join("");
+}
+function wireLandingUI() {
+  $("#newProjectBtn").addEventListener("click", async () => {
+    const org = $("#newOrgInput").value.trim();
+    const dept = $("#newDeptInput").value.trim();
+    const name = $("#newNameInput").value.trim();
+    if (!name) { $("#newNameInput").focus(); return; }
+    const { data, error } = await supabase.from("projects").insert({ org, dept, name }).select().single();
+    if (error) { console.error(error); return; }
+    location.href = "?p=" + data.id;
+  });
+}
+
+// ---------- project detail ----------
+async function enterProject(projectId) {
+  await loadProject(projectId);
+  if (!state.project) { location.href = "./"; return; }
+  await loadTasks();
+  $("#app").hidden = false;
+  $("#modeBadge").textContent = "✏️ 편집 가능";
+  $("#modeBadge").classList.add("edit");
+  renderAll();
+  wireStaticUI();
+  subscribeRealtime();
+}
+
+async function loadProject(projectId) {
+  const { data, error } = await supabase.from("projects").select("*").eq("id", projectId).maybeSingle();
+  if (error) { console.error(error); return; }
+  state.project = data || null;
 }
 async function loadTasks() {
   if (!state.project) return;
