@@ -3,10 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const cfg = window.APP_CONFIG;
 const supabase = createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
-// 진행중(초록)/지연(빨강)/완료(회색) 상태 색상과 헷갈릴 수 있는 팔레트 색은 선택지에서 제외합니다.
-const STATUS_LIKE_COLORS = new Set(["#16a34a", "#15803d", "#dc2626", "#65a30d", "#b91c1c", "#059669", "#475569", "#e11d48"]);
-const PALETTE = Array.from({ length: 30 }, (_, i) => getComputedStyle(document.documentElement).getPropertyValue(`--p${i + 1}`).trim())
-  .filter(c => !STATUS_LIKE_COLORS.has(c.toLowerCase()));
+// 서로 뚜렷이 구분되고, 진행중(초록)/지연(빨강)/완료(회색) 상태 색상과도 겹치지 않도록 정리한 팔레트 (style.css --p1~--p10)
+const PALETTE = Array.from({ length: 10 }, (_, i) => getComputedStyle(document.documentElement).getPropertyValue(`--p${i + 1}`).trim());
 const STATUS_LABEL = { todo: "예정", doing: "진행중", done: "완료" };
 const DAYPX = 20;
 
@@ -595,7 +593,7 @@ function renderCards() {
 function openColorPicker(anchorEl, taskId) {
   const picker = $("#colorPicker");
   const rect = anchorEl.getBoundingClientRect();
-  const pickerHeight = 190;
+  const pickerHeight = 90;
   let top = rect.bottom + 6;
   if (top + pickerHeight > window.innerHeight) top = Math.max(8, rect.top - pickerHeight - 6);
   picker.style.top = top + "px";

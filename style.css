@@ -7,12 +7,9 @@
   --good: #0ca30c; --warning: #fab219; --critical: #d03b3b; --delay: #bf6260;
   --shadow: 0 1px 2px rgba(16,22,15,0.06), 0 8px 24px -12px rgba(16,22,15,0.18);
 
-  --p1: #2563eb; --p2: #ea580c; --p3: #16a34a; --p4: #ca8a04; --p5: #db2777;
-  --p6: #15803d; --p7: #6d28d9; --p8: #dc2626; --p9: #0891b2; --p10: #7c3aed;
-  --p11: #b45309; --p12: #be185d; --p13: #4338ca; --p14: #4d7c0f; --p15: #c2410c;
-  --p16: #0369a1; --p17: #a21caf; --p18: #65a30d; --p19: #b91c1c; --p20: #0f766e;
-  --p21: #7e22ce; --p22: #a16207; --p23: #1d4ed8; --p24: #9d174d; --p25: #059669;
-  --p26: #9333ea; --p27: #475569; --p28: #e11d48; --p29: #0e7490; --p30: #78350f;
+  /* 서로 뚜렷이 구분되도록 정리한 구분(phase) 색상 팔레트. 진행중/지연/완료 상태색(초록·빨강·회색)과 겹치는 색은 넣지 않습니다. */
+  --p1: #2563eb; --p2: #0891b2; --p3: #4338ca; --p4: #7c3aed; --p5: #a21caf;
+  --p6: #db2777; --p7: #9d174d; --p8: #ea580c; --p9: #ca8a04; --p10: #b45309;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -181,7 +178,7 @@ h1.title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; font
 .card-field input, .card-field select, .card-field textarea { width: 100%; font: inherit; font-size: 13px; border: 1px solid var(--border); border-radius: 8px; padding: 7px 8px; background: var(--page); color: var(--ink); }
 
 /* ---- color picker ---- */
-.color-picker { position: fixed; z-index: 200; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 12px; box-shadow: var(--shadow); padding: 10px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.color-picker { position: fixed; z-index: 200; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 12px; box-shadow: var(--shadow); padding: 10px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
 .color-swatch { width: 26px; height: 26px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; }
 .color-swatch.selected { border-color: var(--ink); }
 
