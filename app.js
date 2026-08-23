@@ -15,6 +15,31 @@ let taskFilters = { phase: "", status: "", owner: "" };
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
+// ---------- light / dark theme toggle ----------
+function loadTheme() {
+  const saved = localStorage.getItem("theme");
+  if (saved === "light" || saved === "dark") return saved;
+  const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  return prefersDark ? "dark" : "light";
+}
+let currentTheme = loadTheme();
+function applyTheme() {
+  document.documentElement.setAttribute("data-theme", currentTheme);
+  const btn = document.getElementById("themeToggleBtn");
+  if (btn) btn.textContent = currentTheme === "dark" ? "☀️" : "🌙";
+}
+applyTheme();
+function wireThemeToggle() {
+  const btn = document.getElementById("themeToggleBtn");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    currentTheme = currentTheme === "dark" ? "light" : "dark";
+    try { localStorage.setItem("theme", currentTheme); } catch (e) {}
+    applyTheme();
+  });
+}
+wireThemeToggle();
+
 function fmtDate(d) {
   if (!d) return "";
   return d;
@@ -295,14 +320,27 @@ function subscribeRealtime() {
 function applyRemoteTaskChange(payload) {
   if (payload.eventType === "INSERT") {
     if (!state.tasks.find(t => t.id === payload.new.id)) state.tasks.push(payload.new);
-  } else if (payload.eventType === "UPDATE") {
-    const i = state.tasks.findIndex(t => t.id === payload.new.id);
-    if (i >= 0) state.tasks[i] = payload.new;
-  } else if (payload.eventType === "DELETE") {
-    state.tasks = state.tasks.filter(t => t.id !== payload.old.id);
+    state.tasks.sort((a, b) => a.sort_order - b.sort_order);
+    renderAll();
+    return;
   }
-  state.tasks.sort((a, b) => a.sort_order - b.sort_order);
-  renderAll();
+  if (payload.eventType === "DELETE") {
+    state.tasks = state.tasks.filter(t => t.id !== payload.old.id);
+    renderAll();
+    return;
+  }
+  // UPDATE: patch only the affected row/card so other rows aren't yanked out
+  // from under an in-progress click (this was causing missed clicks when
+  // assigning 담당자 on several tasks back-to-back).
+  const i = state.tasks.findIndex(t => t.id === payload.new.id);
+  if (i < 0) return;
+  state.tasks[i] = payload.new;
+  patchTaskRow(payload.new.id);
+  patchTaskCard(payload.new.id);
+  applyTaskFilters();
+  renderStats();
+  renderLegend();
+  renderGantt();
 }
 
 // ---------- save helpers ----------
@@ -450,12 +488,9 @@ function escapeHtml(s) {
   return (s || "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
-function renderTable() {
-  const tbody = $("#taskTbody");
-  const dis = !state.editMode ? "disabled" : "";
-  tbody.innerHTML = state.tasks.map((t, idx) => {
-    const ts = deriveTaskStatus(t);
-    return `
+function buildTaskRowHtml(t, dis) {
+  const ts = deriveTaskStatus(t);
+  return `
     <tr draggable="${state.editMode}" data-id="${t.id}">
       <td class="col-drag"><span class="drag-handle">⠿</span></td>
       <td class="col-color"><button type="button" class="color-swatch-btn" style="background:${t.phase_color}" data-action="color" data-id="${t.id}" title="클릭하면 색상을 바꿀 수 있어요" ${dis}></button></td>
@@ -472,23 +507,44 @@ function renderTable() {
       <td class="col-del">${state.editMode ? `<button class="del-btn" data-action="del" data-id="${t.id}">✕</button>` : ""}</td>
     </tr>
   `;
-  }).join("") + (state.editMode ? `
-    <tr class="add-task-row">
-      <td colspan="11"><button type="button" class="add-task-row-btn" id="addTaskBtnDesktop">+ 업무 추가</button></td>
-    </tr>
-  ` : "");
-
-  tbody.querySelectorAll("input,select").forEach(el => {
+}
+function wireTaskRowEl(tr) {
+  tr.querySelectorAll("input,select").forEach(el => {
     el.addEventListener("change", () => {
       updateTaskField(el.dataset.id, el.dataset.field, el.value);
       if (["status", "start_date", "end_date"].includes(el.dataset.field)) refreshTaskDerivedViews();
     });
   });
-  tbody.querySelectorAll('[data-action="del"]').forEach(el => el.addEventListener("click", () => deleteTask(el.dataset.id)));
-  tbody.querySelectorAll('[data-action="color"]').forEach(el => el.addEventListener("click", (e) => {
+  tr.querySelectorAll('[data-action="del"]').forEach(el => el.addEventListener("click", () => deleteTask(el.dataset.id)));
+  tr.querySelectorAll('[data-action="color"]').forEach(el => el.addEventListener("click", (e) => {
     if (e.target.tagName === "INPUT") return;
     if (state.editMode) openColorPicker(el, el.dataset.id);
   }));
+}
+function patchTaskRow(taskId) {
+  const t = state.tasks.find(x => x.id === taskId);
+  const tbody = $("#taskTbody");
+  if (!tbody) return;
+  const oldTr = tbody.querySelector(`tr[data-id="${taskId}"]`);
+  if (!t || !oldTr) return;
+  if (oldTr.contains(document.activeElement)) return;
+  const dis = !state.editMode ? "disabled" : "";
+  const wrapper = document.createElement("tbody");
+  wrapper.innerHTML = buildTaskRowHtml(t, dis);
+  const newTr = wrapper.firstElementChild;
+  wireTaskRowEl(newTr);
+  oldTr.replaceWith(newTr);
+}
+function renderTable() {
+  const tbody = $("#taskTbody");
+  const dis = !state.editMode ? "disabled" : "";
+  tbody.innerHTML = state.tasks.map(t => buildTaskRowHtml(t, dis)).join("") + (state.editMode ? `
+    <tr class="add-task-row">
+      <td colspan="11"><button type="button" class="add-task-row-btn" id="addTaskBtnDesktop">+ 업무 추가</button></td>
+    </tr>
+  ` : "");
+
+  tbody.querySelectorAll("tr[data-id]").forEach(wireTaskRowEl);
   const addBtn = tbody.querySelector("#addTaskBtnDesktop");
   if (addBtn) addBtn.addEventListener("click", addTask);
   wireDragReorder(tbody);
@@ -578,7 +634,7 @@ function wireGanttVResizer() {
 }
 function loadGanttLabelWidth() {
   const v = parseInt(localStorage.getItem("ganttLabelWidth") || "", 10);
-  return Number.isFinite(v) && v >= 100 && v <= 400 ? v : 230;
+  return Number.isFinite(v) && v >= 100 && v <= 400 ? v : 260;
 }
 let ganttLabelWidth = loadGanttLabelWidth();
 function wireGanttResizer() {
@@ -633,7 +689,7 @@ function buildGanttHtml(tasks, daypx) {
   let html = `<div class="gantt-month-row" style="width:${rowWidth}px">
     <div class="gantt-spacer" style="width:${ganttLabelWidth}px"><div class="gantt-resizer" id="ganttResizer" title="드래그해서 업무명 폭 조정"></div></div>
     <div class="gantt-month-track" style="width:${trackWidth}px">
-      ${monthSegments.map(s => `<span style="width:${s.days * daypx}px">${s.label}</span>`).join("")}
+      ${monthSegments.map((s, i) => `<span class="${i % 2 === 1 ? "alt" : ""}" style="width:${s.days * daypx}px">${s.label}</span>`).join("")}
     </div>
   </div>`;
 
@@ -663,18 +719,24 @@ function buildGanttHtml(tasks, daypx) {
     const labelHtml = ts.key === "todo" ? "" : `<span class="gantt-bar-label">${ts.label}</span>`;
     const ownerText = t.owner ? escapeHtml(t.owner) : "미배정";
     html += `<div class="gantt-row" style="grid-template-columns:${ganttLabelWidth}px 1fr;width:${rowWidth}px">
-      <div class="gantt-row-label" style="border-left:4px solid ${t.phase_color}">
-        <div class="gantt-row-main">
-          <span class="gantt-row-phase-chip" style="background:${t.phase_color}">${escapeHtml(t.phase_name || "구분")}</span>
-          <span class="gantt-row-name" title="${escapeHtml(t.name || "")}">${escapeHtml(t.name || "(제목 없음)")}</span>
-          <span class="gantt-row-owner">${ownerText}</span>
-          <span class="task-status-badge ${ts.key}">${ts.label}</span>
-        </div>
+      <div class="gantt-row-label">
+        <div class="gantt-row-name-box" style="background:${t.phase_color}" title="${escapeHtml(t.phase_name || "구분")} · ${escapeHtml(t.name || "")}">${escapeHtml(t.name || "(제목 없음)")}</div>
+        <div class="gantt-row-owner-col">${ownerText}</div>
+        <div class="gantt-row-status-col"><span class="task-status-badge ${ts.key}">${ts.label}</span></div>
       </div>
       <div class="gantt-track" style="width:${trackWidth}px">
         <div class="gantt-bar ${ts.key}" style="left:${barLeft}px;width:${barWidth}px;background:${barColor}" title="${escapeHtml(t.name)}">${labelHtml}</div>
       </div>
     </div>`;
+  });
+
+  let cursorDays = 0;
+  monthSegments.forEach((s, i) => {
+    cursorDays += s.days;
+    if (i < monthSegments.length - 1) {
+      const lineLeft = ganttLabelWidth + cursorDays * daypx;
+      html += `<div class="gantt-month-line" style="left:${lineLeft}px"></div>`;
+    }
   });
 
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -686,12 +748,9 @@ function buildGanttHtml(tasks, daypx) {
   return html;
 }
 
-function renderCards() {
-  const list = $("#cardList");
-  const dis = !state.editMode ? "disabled" : "";
-  list.innerHTML = state.tasks.map((t, idx) => {
-    const ts = deriveTaskStatus(t);
-    return `
+function buildTaskCardHtml(t, idx, dis) {
+  const ts = deriveTaskStatus(t);
+  return `
     <div class="task-card" data-id="${t.id}">
       <div class="card-top">
         <span class="phase-pill" style="background:${t.phase_color}" data-action="color" data-id="${t.id}" title="클릭하면 색상을 바꿀 수 있어요">
@@ -720,21 +779,42 @@ function renderCards() {
       </div>
     </div>
   `;
-  }).join("") + (state.editMode ? `<button type="button" class="add-task-card-btn" id="addTaskBtnMobile">+ 업무 추가</button>` : "");
-
-  list.querySelectorAll("input,select").forEach(el => {
+}
+function wireTaskCardEl(card) {
+  card.querySelectorAll("input,select").forEach(el => {
     el.addEventListener("change", () => {
       updateTaskField(el.dataset.id, el.dataset.field, el.value);
       if (["status", "start_date", "end_date"].includes(el.dataset.field)) refreshTaskDerivedViews();
     });
   });
-  list.querySelectorAll('[data-action="del"]').forEach(el => el.addEventListener("click", () => deleteTask(el.dataset.id)));
-  list.querySelectorAll('[data-action="up"]').forEach(el => el.addEventListener("click", () => moveTask(el.dataset.id, -1)));
-  list.querySelectorAll('[data-action="down"]').forEach(el => el.addEventListener("click", () => moveTask(el.dataset.id, 1)));
-  list.querySelectorAll('[data-action="color"]').forEach(el => el.addEventListener("click", (e) => {
+  card.querySelectorAll('[data-action="del"]').forEach(el => el.addEventListener("click", () => deleteTask(el.dataset.id)));
+  card.querySelectorAll('[data-action="up"]').forEach(el => el.addEventListener("click", () => moveTask(el.dataset.id, -1)));
+  card.querySelectorAll('[data-action="down"]').forEach(el => el.addEventListener("click", () => moveTask(el.dataset.id, 1)));
+  card.querySelectorAll('[data-action="color"]').forEach(el => el.addEventListener("click", (e) => {
     if (e.target.tagName === "INPUT") return;
     if (state.editMode) openColorPicker(el, el.dataset.id);
   }));
+}
+function patchTaskCard(taskId) {
+  const idx = state.tasks.findIndex(x => x.id === taskId);
+  const list = $("#cardList");
+  if (!list || idx < 0) return;
+  const oldCard = list.querySelector(`.task-card[data-id="${taskId}"]`);
+  if (!oldCard) return;
+  if (oldCard.contains(document.activeElement)) return;
+  const dis = !state.editMode ? "disabled" : "";
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = buildTaskCardHtml(state.tasks[idx], idx, dis);
+  const newCard = wrapper.firstElementChild;
+  wireTaskCardEl(newCard);
+  oldCard.replaceWith(newCard);
+}
+function renderCards() {
+  const list = $("#cardList");
+  const dis = !state.editMode ? "disabled" : "";
+  list.innerHTML = state.tasks.map((t, idx) => buildTaskCardHtml(t, idx, dis)).join("") + (state.editMode ? `<button type="button" class="add-task-card-btn" id="addTaskBtnMobile">+ 업무 추가</button>` : "");
+
+  list.querySelectorAll(".task-card").forEach(wireTaskCardEl);
   const addBtnMobile = list.querySelector("#addTaskBtnMobile");
   if (addBtnMobile) addBtnMobile.addEventListener("click", addTask);
 
