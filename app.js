@@ -5,7 +5,7 @@ const supabase = createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
 const PALETTE = Array.from({ length: 30 }, (_, i) => getComputedStyle(document.documentElement).getPropertyValue(`--p${i + 1}`).trim());
 const STATUS_LABEL = { todo: "예정", doing: "진행중", done: "완료" };
-const DAYPX = 28;
+const DAYPX = 20;
 
 let state = { project: null, tasks: [], editMode: false };
 let saveTimers = new Map();
@@ -403,27 +403,59 @@ function renderGantt() {
   if (!state.tasks.length) { wrap.innerHTML = `<div style="color:var(--ink-muted);font-size:12px;padding:10px;">일정을 추가하면 타임라인이 표시됩니다.</div>`; return; }
   wrap.innerHTML = buildGanttHtml(state.tasks, DAYPX);
 }
+const GANTT_LABEL_W = 160;
+function buildGanttMonthSegments(minDate, totalDays) {
+  const segments = [];
+  let cur = new Date(minDate);
+  const rangeEnd = new Date(minDate);
+  rangeEnd.setDate(rangeEnd.getDate() + totalDays - 1);
+  while (cur <= rangeEnd) {
+    const y = cur.getFullYear(), m = cur.getMonth();
+    const monthLastDay = new Date(y, m + 1, 0);
+    const segEnd = monthLastDay < rangeEnd ? monthLastDay : rangeEnd;
+    const lengthDays = daysBetween(cur, segEnd) + 1;
+    segments.push({ label: `${y}년 ${m + 1}월`, days: lengthDays });
+    cur = new Date(segEnd);
+    cur.setDate(cur.getDate() + 1);
+  }
+  return segments;
+}
 function buildGanttHtml(tasks, daypx) {
   const dated = tasks.filter(t => t.start_date && t.end_date);
   if (!dated.length) return `<div style="color:var(--ink-muted);font-size:12px;padding:10px;">시작일/종료일을 입력하면 타임라인이 표시됩니다.</div>`;
   const minDate = dated.reduce((m, t) => t.start_date < m ? t.start_date : m, dated[0].start_date);
   const maxDate = dated.reduce((m, t) => t.end_date > m ? t.end_date : m, dated[0].end_date);
   const totalDays = Math.max(1, daysBetween(minDate, maxDate) + 1);
+  const trackWidth = totalDays * daypx;
+  const rowWidth = GANTT_LABEL_W + trackWidth;
+
+  const monthSegments = buildGanttMonthSegments(minDate, totalDays);
+  let html = `<div class="gantt-month-row" style="width:${rowWidth}px">
+    <div class="gantt-spacer"></div>
+    <div class="gantt-month-track" style="width:${trackWidth}px">
+      ${monthSegments.map(s => `<span style="width:${s.days * daypx}px">${s.label}</span>`).join("")}
+    </div>
+  </div>`;
+
   const rulerCols = [];
   for (let i = 0; i <= totalDays; i += 7) rulerCols.push(i);
-  let html = `<div class="gantt-ruler" style="width:${totalDays * daypx}px">`;
-  rulerCols.forEach(d => {
-    const dt = new Date(minDate); dt.setDate(dt.getDate() + d);
-    html += `<span style="width:${7 * daypx}px;flex:none">${dt.getMonth() + 1}/${dt.getDate()}</span>`;
-  });
-  html += `</div>`;
+  html += `<div class="gantt-ruler" style="width:${rowWidth}px">
+    <div class="gantt-spacer"></div>
+    <div class="gantt-ruler-track" style="width:${trackWidth}px">
+      ${rulerCols.map(d => {
+        const dt = new Date(minDate); dt.setDate(dt.getDate() + d);
+        return `<span style="width:${7 * daypx}px;flex:none">${dt.getMonth() + 1}/${dt.getDate()}</span>`;
+      }).join("")}
+    </div>
+  </div>`;
+
   tasks.forEach(t => {
     if (!t.start_date || !t.end_date) return;
     const off = daysBetween(minDate, t.start_date);
     const len = Math.max(1, daysBetween(t.start_date, t.end_date) + 1);
-    html += `<div class="gantt-row" style="grid-template-columns:160px 1fr;width:${160 + totalDays * daypx}px">
+    html += `<div class="gantt-row" style="grid-template-columns:${GANTT_LABEL_W}px 1fr;width:${rowWidth}px">
       <div class="gantt-row-label">${escapeHtml(t.name || "(제목 없음)")}</div>
-      <div class="gantt-track" style="width:${totalDays * daypx}px">
+      <div class="gantt-track" style="width:${trackWidth}px">
         <div class="gantt-bar" style="left:${off * daypx}px;width:${len * daypx - 3}px;background:${t.phase_color}" title="${escapeHtml(t.name)}"></div>
       </div>
     </div>`;
@@ -572,7 +604,7 @@ function wireStaticUI() {
   $("#addTaskBtnDesktop").hidden = !state.editMode;
   $("#addTaskBtnMobile").hidden = !state.editMode;
   $("#timelineOpenBtn").addEventListener("click", () => {
-    $("#ganttOverlayBody").innerHTML = buildGanttHtml(state.tasks, 18);
+    $("#ganttOverlayBody").innerHTML = buildGanttHtml(state.tasks, 14);
     $("#ganttOverlay").hidden = false;
   });
   $("#timelineCloseBtn").addEventListener("click", () => { $("#ganttOverlay").hidden = true; });
