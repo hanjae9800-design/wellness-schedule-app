@@ -49,6 +49,7 @@ function logPageView(page, projectId) {
 
 // ---------- landing (project list) ----------
 let landingProjects = [];
+let landingProgress = {};
 let selectedProjectIds = new Set();
 
 async function enterLanding() {
@@ -56,26 +57,48 @@ async function enterLanding() {
   const { data, error } = await supabase.from("projects").select("*").order("created_at", { ascending: false });
   if (error) throw error;
   landingProjects = data || [];
+  await loadLandingProgress();
   renderLanding();
   wireLandingUI();
   $("#landing").hidden = false;
+}
+async function loadLandingProgress() {
+  const { data, error } = await supabase.from("tasks").select("project_id, status");
+  if (error) { console.error(error); landingProgress = {}; return; }
+  const stats = {};
+  (data || []).forEach(t => {
+    if (!stats[t.project_id]) stats[t.project_id] = { total: 0, done: 0 };
+    stats[t.project_id].total += 1;
+    if (t.status === "done") stats[t.project_id].done += 1;
+  });
+  landingProgress = stats;
 }
 function renderLanding() {
   const list = $("#projectList");
   if (!landingProjects.length) {
     list.innerHTML = `<div class="empty-note">아직 만들어진 프로젝트가 없습니다. 아래에서 새로 만들어보세요.</div>`;
   } else {
-    list.innerHTML = landingProjects.map(p => `
+    list.innerHTML = landingProjects.map(p => {
+      const prog = landingProgress[p.id];
+      const total = prog ? prog.total : 0;
+      const done = prog ? prog.done : 0;
+      const pct = total ? Math.round(done / total * 100) : 0;
+      return `
       <div class="project-card" data-id="${p.id}">
         <label class="pc-check"><input type="checkbox" class="pc-checkbox" data-id="${p.id}" ${selectedProjectIds.has(p.id) ? "checked" : ""}></label>
         <a class="pc-body" href="?p=${p.id}">
           <div class="pc-eyebrow">${escapeHtml(p.org || "")}${p.dept ? " / " + escapeHtml(p.dept) : ""}${p.pm ? " / PM " + escapeHtml(p.pm) : ""}</div>
           <div class="pc-name">${escapeHtml(p.name || "(제목 없음)")} 추진일정</div>
           <div class="pc-meta">생성일 ${p.created_at ? p.created_at.slice(0, 10) : ""} · <span class="pc-mode ${p.mode === "edit" ? "edit" : ""}">${p.mode === "edit" ? "✏️ 편집 가능" : "🔒 보기 전용"}</span></div>
+          <div class="pc-progress">
+            <div class="pc-progress-bar"><div class="pc-progress-fill" style="width:${pct}%"></div></div>
+            <span class="pc-progress-label">${total ? `${pct}% (${done}/${total})` : "업무 없음"}</span>
+          </div>
         </a>
         <button type="button" class="pc-del" data-id="${p.id}" aria-label="삭제">✕</button>
       </div>
-    `).join("");
+    `;
+    }).join("");
   }
   list.querySelectorAll(".pc-checkbox").forEach(cb => {
     cb.addEventListener("change", () => {
