@@ -44,28 +44,68 @@ async function initGate() {
 }
 
 // ---------- landing (project list) ----------
+let landingProjects = [];
+let selectedProjectIds = new Set();
+
 async function enterLanding() {
   const { data, error } = await supabase.from("projects").select("*").order("created_at", { ascending: false });
   if (error) throw error;
-  renderLanding(data || []);
+  landingProjects = data || [];
+  renderLanding();
   wireLandingUI();
   $("#landing").hidden = false;
 }
-function renderLanding(projects) {
+function renderLanding() {
   const list = $("#projectList");
-  if (!projects.length) {
+  if (!landingProjects.length) {
     list.innerHTML = `<div class="empty-note">아직 만들어진 프로젝트가 없습니다. 아래에서 새로 만들어보세요.</div>`;
-    return;
+  } else {
+    list.innerHTML = landingProjects.map(p => `
+      <div class="project-card" data-id="${p.id}">
+        <label class="pc-check"><input type="checkbox" class="pc-checkbox" data-id="${p.id}" ${selectedProjectIds.has(p.id) ? "checked" : ""}></label>
+        <a class="pc-body" href="?p=${p.id}">
+          <div class="pc-eyebrow">${escapeHtml(p.org || "")}${p.dept ? " / " + escapeHtml(p.dept) : ""}</div>
+          <div class="pc-name">${escapeHtml(p.name || "(제목 없음)")} 추진일정</div>
+          <div class="pc-meta">생성일 ${p.created_at ? p.created_at.slice(0, 10) : ""}</div>
+        </a>
+        <button type="button" class="pc-del" data-id="${p.id}" aria-label="삭제">✕</button>
+      </div>
+    `).join("");
   }
-  list.innerHTML = projects.map(p => `
-    <a class="project-card" href="?p=${p.id}">
-      <div class="pc-eyebrow">${escapeHtml(p.org || "")}${p.dept ? " / " + escapeHtml(p.dept) : ""}</div>
-      <div class="pc-name">${escapeHtml(p.name || "(제목 없음)")} 추진일정</div>
-      <div class="pc-meta">생성일 ${p.created_at ? p.created_at.slice(0, 10) : ""}</div>
-    </a>
-  `).join("");
+  list.querySelectorAll(".pc-checkbox").forEach(cb => {
+    cb.addEventListener("change", () => {
+      if (cb.checked) selectedProjectIds.add(cb.dataset.id);
+      else selectedProjectIds.delete(cb.dataset.id);
+      updateBulkBar();
+    });
+  });
+  list.querySelectorAll(".pc-del").forEach(btn => {
+    btn.addEventListener("click", () => deleteProjects([btn.dataset.id]));
+  });
+  updateBulkBar();
+}
+function updateBulkBar() {
+  const bar = $("#bulkBar");
+  if (selectedProjectIds.size > 0) {
+    bar.hidden = false;
+    $("#bulkCount").textContent = `${selectedProjectIds.size}개 선택됨`;
+  } else {
+    bar.hidden = true;
+  }
+}
+async function deleteProjects(ids) {
+  const names = landingProjects.filter(p => ids.includes(p.id)).map(p => p.name || "(제목 없음)").join(", ");
+  const ok = confirm(`${ids.length}개 프로젝트를 삭제할까요?\n(${names})\n\n포함된 모든 업무 데이터도 함께 삭제되며 되돌릴 수 없습니다.`);
+  if (!ok) return;
+  const { error } = await supabase.from("projects").delete().in("id", ids);
+  if (error) { console.error(error); alert("삭제 중 오류가 발생했습니다: " + error.message); return; }
+  landingProjects = landingProjects.filter(p => !ids.includes(p.id));
+  ids.forEach(id => selectedProjectIds.delete(id));
+  renderLanding();
 }
 function wireLandingUI() {
+  $("#bulkDeleteBtn").addEventListener("click", () => deleteProjects([...selectedProjectIds]));
+  $("#bulkClearBtn").addEventListener("click", () => { selectedProjectIds.clear(); renderLanding(); });
   $("#newProjectBtn").addEventListener("click", async () => {
     const org = $("#newOrgInput").value.trim();
     const dept = $("#newDeptInput").value.trim();

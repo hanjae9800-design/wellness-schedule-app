@@ -15,6 +15,11 @@
   <div class="landing-wrap">
     <h1 class="landing-title">프로젝트 추진일정</h1>
     <p class="landing-sub">진행 중인 프로젝트를 선택하거나 새로 만드세요. 링크만 있으면 누구나 실시간으로 함께 편집할 수 있습니다.</p>
+    <div class="bulk-bar" id="bulkBar" hidden>
+      <span id="bulkCount"></span>
+      <button type="button" class="danger" id="bulkDeleteBtn">선택 삭제</button>
+      <button type="button" class="link-btn" id="bulkClearBtn">선택 해제</button>
+    </div>
     <div class="project-list" id="projectList"></div>
     <div class="new-project-box">
       <h2>+ 새 프로젝트 만들기</h2>
