@@ -339,6 +339,7 @@ function applyRemoteTaskChange(payload) {
   patchTaskCard(payload.new.id);
   applyTaskFilters();
   renderStats();
+  renderOwnerSummary();
   renderLegend();
   renderGantt();
 }
@@ -401,6 +402,7 @@ function moveTask(id, dir) {
 function renderAll() {
   renderHeader();
   renderStats();
+  renderOwnerSummary();
   renderLegend();
   renderTable();
   renderGantt();
@@ -408,6 +410,7 @@ function renderAll() {
 }
 function refreshTaskDerivedViews() {
   renderStats();
+  renderOwnerSummary();
   renderTable();
   renderGantt();
   renderCards();
@@ -477,6 +480,36 @@ function renderStats() {
     <div class="stat-chip">진행중 <b>${doing}</b></div>
     <div class="stat-chip">진행률 <b>${total ? Math.round(done / total * 100) : 0}%</b></div>
   `;
+}
+function renderOwnerSummary() {
+  const el = $("#ownerSummary");
+  if (el.hidden) return;
+  const groups = new Map();
+  state.tasks.forEach(t => {
+    const owner = (t.owner || "").trim() || "미배정";
+    if (!groups.has(owner)) groups.set(owner, { total: 0, doing: 0, delayed: 0, done: 0, todo: 0 });
+    const g = groups.get(owner);
+    g.total++;
+    g[deriveTaskStatus(t).key]++;
+  });
+  const owners = [...groups.keys()].sort((a, b) => a === "미배정" ? 1 : b === "미배정" ? -1 : groups.get(b).total - groups.get(a).total);
+  if (!owners.length) { el.innerHTML = `<div class="owner-summary-empty">업무가 없습니다</div>`; return; }
+  el.innerHTML = owners.map(owner => {
+    const g = groups.get(owner);
+    const donePct = g.total ? Math.round(g.done / g.total * 100) : 0;
+    return `
+    <div class="owner-summary-row">
+      <div class="owner-summary-name">${escapeHtml(owner)}</div>
+      <div class="owner-summary-counts">
+        <span class="owner-count total">전체 ${g.total}</span>
+        <span class="owner-count doing">진행중 ${g.doing}</span>
+        <span class="owner-count delayed">지연 ${g.delayed}</span>
+        <span class="owner-count done">완료 ${g.done}</span>
+      </div>
+      <div class="owner-summary-bar"><div class="owner-summary-bar-fill" style="width:${donePct}%"></div></div>
+      <div class="owner-summary-pct">${donePct}%</div>
+    </div>`;
+  }).join("");
 }
 function renderLegend() {
   const phases = [...new Map(state.tasks.map(t => [t.phase_name, t.phase_color])).entries()];
@@ -751,7 +784,8 @@ function buildGanttHtml(tasks, daypx) {
   const todayOffsetDays = daysBetween(minDate, todayStr);
   if (todayOffsetDays >= 0 && todayOffsetDays <= totalDays) {
     const todayLeft = ganttLabelWidth + todayOffsetDays * daypx;
-    html += `<div class="gantt-today-line" style="left:${todayLeft}px"><span class="gantt-today-label">오늘</span></div>`;
+    const todayLabelDate = new Date(todayStr);
+    html += `<div class="gantt-today-line" style="left:${todayLeft}px"><span class="gantt-today-label">오늘 (${todayLabelDate.getMonth() + 1}/${todayLabelDate.getDate()})</span></div>`;
   }
   return html;
 }
@@ -940,6 +974,10 @@ function wireStaticUI() {
     $("#ganttOverlay").hidden = false;
   });
   $("#timelineCloseBtn").addEventListener("click", () => { $("#ganttOverlay").hidden = true; });
+  $("#ownerSummaryToggleBtn").addEventListener("click", () => {
+    $("#ownerSummary").hidden = !$("#ownerSummary").hidden;
+    renderOwnerSummary();
+  });
   wireColumnResize();
 }
 
