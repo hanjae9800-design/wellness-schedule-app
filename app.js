@@ -27,7 +27,6 @@ function getProjectIdFromUrl() {
 }
 
 async function initGate() {
-  state.editMode = true;
   const pid = getProjectIdFromUrl();
   try {
     if (pid) {
@@ -72,7 +71,7 @@ function renderLanding() {
         <a class="pc-body" href="?p=${p.id}">
           <div class="pc-eyebrow">${escapeHtml(p.org || "")}${p.dept ? " / " + escapeHtml(p.dept) : ""}</div>
           <div class="pc-name">${escapeHtml(p.name || "(제목 없음)")} 추진일정</div>
-          <div class="pc-meta">생성일 ${p.created_at ? p.created_at.slice(0, 10) : ""}</div>
+          <div class="pc-meta">생성일 ${p.created_at ? p.created_at.slice(0, 10) : ""} · <span class="pc-mode ${p.mode === "edit" ? "edit" : ""}">${p.mode === "edit" ? "✏️ 편집 가능" : "🔒 보기 전용"}</span></div>
         </a>
         <button type="button" class="pc-del" data-id="${p.id}" aria-label="삭제">✕</button>
       </div>
@@ -117,7 +116,7 @@ function wireLandingUI() {
     const dept = $("#newDeptInput").value.trim();
     const name = $("#newNameInput").value.trim();
     if (!name) { $("#newNameInput").focus(); return; }
-    const { data, error } = await supabase.from("projects").insert({ org, dept, name }).select().single();
+    const { data, error } = await supabase.from("projects").insert({ org, dept, name, mode: "view" }).select().single();
     if (error) { console.error(error); return; }
     location.href = "?p=" + data.id;
   });
@@ -129,12 +128,31 @@ async function enterProject(projectId) {
   if (!state.project) { location.href = "./"; return; }
   logPageView("project", projectId);
   await loadTasks();
+  state.editMode = state.project.mode === "edit";
   $("#app").hidden = false;
-  $("#modeBadge").textContent = "✏️ 편집 가능";
-  $("#modeBadge").classList.add("edit");
   renderAll();
   wireStaticUI();
+  wireModeToggle();
   subscribeRealtime();
+}
+
+function renderModeBadge() {
+  const badge = $("#modeBadge");
+  badge.textContent = state.editMode ? "✏️ 편집 가능" : "🔒 보기 전용";
+  badge.classList.toggle("edit", state.editMode);
+}
+function wireModeToggle() {
+  renderModeBadge();
+  $("#modeToggleBtn").textContent = state.editMode ? "보기 전용으로 잠그기" : "편집 모드로 전환";
+  $("#modeToggleBtn").onclick = async () => {
+    const newMode = state.editMode ? "view" : "edit";
+    state.editMode = newMode === "edit";
+    state.project.mode = newMode;
+    renderModeBadge();
+    $("#modeToggleBtn").textContent = state.editMode ? "보기 전용으로 잠그기" : "편집 모드로 전환";
+    renderAll();
+    await supabase.from("projects").update({ mode: newMode }).eq("id", state.project.id);
+  };
 }
 
 async function loadProject(projectId) {
