@@ -342,20 +342,54 @@ function renderHeader() {
   $("#orgInput").value = p.org || "";
   $("#deptInput").value = p.dept || "";
   $("#pmInput").value = p.pm || "";
-  $("#teamInput").value = p.team_members || "";
   $("#projNameInput").value = p.name || "";
   const disabled = !state.editMode;
   $("#orgInput").disabled = disabled;
   $("#deptInput").disabled = disabled;
   $("#pmInput").disabled = disabled;
-  $("#teamInput").disabled = disabled;
   $("#projNameInput").disabled = disabled;
+  renderTeamChips();
+  $("#teamAddBtn").hidden = disabled;
   const st = deriveProjectStatus(p.status || "todo", state.tasks);
   const badge = $("#statusBadge");
   badge.textContent = st.label;
   badge.className = "proj-status-badge " + st.key;
   $("#statusSelect").value = p.status || "todo";
   $("#statusSelect").disabled = disabled;
+}
+function getTeamMembers() {
+  return (state.project.team_members || "").split(",").map(s => s.trim()).filter(Boolean);
+}
+function saveTeamMembers(names) {
+  const value = names.join(", ");
+  state.project.team_members = value;
+  updateProjectField("team_members", value);
+  renderTeamChips();
+  renderTable();
+  renderCards();
+}
+function renderTeamChips() {
+  const row = $("#teamChipRow");
+  const names = getTeamMembers();
+  row.innerHTML = names.map(name => `
+    <span class="team-chip">${escapeHtml(name)}${state.editMode ? `<button type="button" class="team-chip-del" data-name="${escapeHtml(name)}" aria-label="삭제">✕</button>` : ""}</span>
+  `).join("");
+  row.querySelectorAll(".team-chip-del").forEach(btn => {
+    btn.addEventListener("click", () => removeTeamMember(btn.dataset.name));
+  });
+}
+function addTeamMember() {
+  const input = prompt("추가할 팀원 이름을 입력하세요");
+  const name = (input || "").trim();
+  if (!name) return;
+  const names = getTeamMembers();
+  if (names.includes(name)) return;
+  names.push(name);
+  saveTeamMembers(names);
+}
+function removeTeamMember(name) {
+  const names = getTeamMembers().filter(n => n !== name);
+  saveTeamMembers(names);
 }
 function renderStats() {
   const total = state.tasks.length;
@@ -697,11 +731,7 @@ function wireStaticUI() {
     renderTable();
     renderCards();
   });
-  $("#teamInput").addEventListener("change", () => {
-    updateProjectField("team_members", $("#teamInput").value);
-    renderTable();
-    renderCards();
-  });
+  $("#teamAddBtn").addEventListener("click", addTeamMember);
   $("#projNameInput").addEventListener("change", () => updateProjectField("name", $("#projNameInput").value));
   $("#statusSelect").addEventListener("change", () => {
     updateProjectField("status", $("#statusSelect").value);
