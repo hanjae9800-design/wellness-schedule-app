@@ -72,6 +72,21 @@
 
   <div class="stats" id="stats"></div>
 
+  <div class="filter-bar" id="filterBar">
+    <span class="filter-label">필터</span>
+    <select id="filterPhase"><option value="">전체 구분</option></select>
+    <select id="filterStatus">
+      <option value="">전체 현황</option>
+      <option value="todo">예정</option>
+      <option value="delayed">지연</option>
+      <option value="doing">진행중</option>
+      <option value="done">완료</option>
+    </select>
+    <select id="filterOwner"><option value="">전체 담당자</option></select>
+    <button type="button" class="link-btn" id="filterResetBtn" hidden>초기화</button>
+    <span class="filter-count" id="filterCount"></span>
+  </div>
+
   <section class="board desktop-only">
     <div class="board-toolbar">
       <button class="primary" id="addTaskBtnDesktop">+ 업무 추가</button>

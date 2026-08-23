@@ -10,6 +10,7 @@ const DAYPX = 20;
 
 let state = { project: null, tasks: [], editMode: false };
 let saveTimers = new Map();
+let taskFilters = { phase: "", status: "", owner: "" };
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
@@ -49,6 +50,40 @@ function deriveTaskStatus(t) {
 }
 
 // ---------- assignee list (PM + 팀원) ----------
+// ---------- task list filters (구분/현황/담당자) ----------
+function taskMatchesFilters(t) {
+  if (taskFilters.phase && (t.phase_name || "") !== taskFilters.phase) return false;
+  if (taskFilters.status && deriveTaskStatus(t).key !== taskFilters.status) return false;
+  if (taskFilters.owner && (t.owner || "") !== taskFilters.owner) return false;
+  return true;
+}
+function renderFilterOptions() {
+  const phaseSel = $("#filterPhase");
+  const ownerSel = $("#filterOwner");
+  const phases = [...new Set(state.tasks.map(t => (t.phase_name || "").trim()).filter(Boolean))];
+  const owners = [...new Set(state.tasks.map(t => (t.owner || "").trim()).filter(Boolean))];
+  phaseSel.innerHTML = `<option value="">전체 구분</option>` + phases.map(name => `<option value="${escapeHtml(name)}" ${taskFilters.phase === name ? "selected" : ""}>${escapeHtml(name)}</option>`).join("");
+  ownerSel.innerHTML = `<option value="">전체 담당자</option>` + owners.map(name => `<option value="${escapeHtml(name)}" ${taskFilters.owner === name ? "selected" : ""}>${escapeHtml(name)}</option>`).join("");
+  if (taskFilters.phase && !phases.includes(taskFilters.phase)) { taskFilters.phase = ""; phaseSel.value = ""; }
+  if (taskFilters.owner && !owners.includes(taskFilters.owner)) { taskFilters.owner = ""; ownerSel.value = ""; }
+  $("#filterStatus").value = taskFilters.status;
+}
+function applyTaskFilters() {
+  let visible = 0;
+  $$("#taskTbody tr").forEach(row => {
+    const t = state.tasks.find(x => x.id === row.dataset.id);
+    const match = !!t && taskMatchesFilters(t);
+    row.hidden = !match;
+    if (match) visible++;
+  });
+  $$("#cardList .task-card").forEach(card => {
+    const t = state.tasks.find(x => x.id === card.dataset.id);
+    card.hidden = !(t && taskMatchesFilters(t));
+  });
+  const active = !!(taskFilters.phase || taskFilters.status || taskFilters.owner);
+  $("#filterResetBtn").hidden = !active;
+  $("#filterCount").textContent = active ? `${visible} / ${state.tasks.length}개 표시` : "";
+}
 function getAssigneeOptions() {
   const p = state.project;
   if (!p) return [];
@@ -638,6 +673,9 @@ function renderCards() {
     if (e.target.tagName === "INPUT") return;
     if (state.editMode) openColorPicker(el, el.dataset.id);
   }));
+
+  renderFilterOptions();
+  applyTaskFilters();
 }
 
 // ---------- color picker ----------
@@ -719,6 +757,14 @@ function wireColumnResize() {
 
 // ---------- mobile gantt overlay ----------
 function wireStaticUI() {
+  $("#filterPhase").addEventListener("change", () => { taskFilters.phase = $("#filterPhase").value; applyTaskFilters(); });
+  $("#filterStatus").addEventListener("change", () => { taskFilters.status = $("#filterStatus").value; applyTaskFilters(); });
+  $("#filterOwner").addEventListener("change", () => { taskFilters.owner = $("#filterOwner").value; applyTaskFilters(); });
+  $("#filterResetBtn").addEventListener("click", () => {
+    taskFilters = { phase: "", status: "", owner: "" };
+    renderFilterOptions();
+    applyTaskFilters();
+  });
   $("#orgInput").addEventListener("change", () => updateProjectField("org", $("#orgInput").value));
   $("#deptInput").addEventListener("change", () => updateProjectField("dept", $("#deptInput").value));
   $("#pmInput").addEventListener("change", () => {
