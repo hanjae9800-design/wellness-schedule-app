@@ -500,6 +500,56 @@ function openColorPicker(anchorEl, taskId) {
   setTimeout(() => document.addEventListener("click", closeOnOutside, true), 0);
 }
 
+// ---------- task table column resize ----------
+const COL_WIDTH_KEY = "taskTableColWidths";
+const MIN_COL_WIDTH = 50;
+function loadColWidths() {
+  try { return JSON.parse(localStorage.getItem(COL_WIDTH_KEY) || "{}"); } catch (e) { return {}; }
+}
+function saveColWidths(widths) {
+  try { localStorage.setItem(COL_WIDTH_KEY, JSON.stringify(widths)); } catch (e) {}
+}
+function applyColWidths() {
+  const widths = loadColWidths();
+  Object.keys(widths).forEach(key => {
+    const col = document.querySelector(`col[data-colkey="${key}"]`);
+    if (col) col.style.width = widths[key] + "px";
+  });
+}
+function wireColumnResize() {
+  applyColWidths();
+  let active = null;
+  let startX = 0;
+  let startWidth = 0;
+  $$(".col-resizer").forEach(handle => {
+    handle.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      const key = handle.dataset.colkey;
+      const col = document.querySelector(`col[data-colkey="${key}"]`);
+      if (!col) return;
+      active = { key, col };
+      startX = e.clientX;
+      startWidth = col.getBoundingClientRect().width;
+      handle.classList.add("active");
+      document.body.style.cursor = "col-resize";
+    });
+  });
+  document.addEventListener("mousemove", (e) => {
+    if (!active) return;
+    const newWidth = Math.max(MIN_COL_WIDTH, Math.round(startWidth + (e.clientX - startX)));
+    active.col.style.width = newWidth + "px";
+  });
+  document.addEventListener("mouseup", () => {
+    if (!active) return;
+    const widths = loadColWidths();
+    widths[active.key] = parseInt(active.col.style.width, 10);
+    saveColWidths(widths);
+    $$(".col-resizer.active").forEach(h => h.classList.remove("active"));
+    document.body.style.cursor = "";
+    active = null;
+  });
+}
+
 // ---------- mobile gantt overlay ----------
 function wireStaticUI() {
   $("#orgInput").addEventListener("change", () => updateProjectField("org", $("#orgInput").value));
@@ -519,6 +569,7 @@ function wireStaticUI() {
     $("#ganttOverlay").hidden = false;
   });
   $("#timelineCloseBtn").addEventListener("click", () => { $("#ganttOverlay").hidden = true; });
+  wireColumnResize();
 }
 
 // ---------- feedback ----------

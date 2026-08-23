@@ -106,9 +106,11 @@ h1.title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; font
 
 /* ---- desktop table ---- */
 .table-scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
-.task-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.task-table th { text-align: left; font-size: 11.5px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.04em; padding: 10px 10px; border-bottom: 1px solid var(--border-strong); white-space: nowrap; }
-.task-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.task-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+.task-table th { position: relative; text-align: center; font-size: 11.5px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.04em; padding: 10px 10px; border-bottom: 1px solid var(--border-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.task-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; overflow: hidden; }
+.col-resizer { position: absolute; top: 0; right: -4px; width: 8px; height: 100%; cursor: col-resize; user-select: none; z-index: 3; }
+.col-resizer:hover, .col-resizer.active { background: var(--accent); opacity: .35; }
 .task-table td.col-phase { text-align: center; }
 .task-table tr.dragging { opacity: 0.4; }
 .col-drag { width: 30px; }
