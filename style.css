@@ -182,6 +182,27 @@ select.task-status-badge:disabled { cursor: default; opacity: .85; }
 .del-btn { background: none; border: none; color: var(--ink-muted); cursor: pointer; font-size: 15px; padding: 4px; }
 .del-btn:hover { color: var(--critical); }
 
+/* ---- phase(구분) group header / collapse ---- */
+.phase-group-row td { padding: 0; border-bottom: none; }
+.phase-group-toggle { display: flex; align-items: center; gap: 8px; width: 100%; background: var(--surface-alt); border: none; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border-strong); padding: 8px 12px; font: inherit; font-weight: 700; font-size: 12.5px; color: var(--ink); cursor: pointer; text-align: left; }
+.phase-group-toggle:hover { background: var(--page); }
+.phase-group-row:first-child .phase-group-toggle { border-top: none; }
+.phase-group-caret { display: inline-block; font-size: 10px; color: var(--ink-muted); transition: transform .15s ease; flex: none; }
+.phase-group-caret.collapsed { transform: rotate(-90deg); }
+.phase-group-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.phase-group-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.phase-group-count { flex: none; font-size: 11px; font-weight: 700; color: var(--ink-muted); background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px; }
+
+.card-group-row { margin: 10px 0 -2px; }
+.card-group-row:first-child { margin-top: 0; }
+.card-group-row .phase-group-toggle { border-radius: 10px; border: 1px solid var(--border); }
+
+.gantt-phase-row { background: var(--surface-alt); }
+.gantt-phase-label { display: block; padding: 0; }
+.gantt-phase-label .phase-group-toggle { height: 100%; border: none; background: transparent; }
+.gantt-phase-row .gantt-track { background: transparent; }
+.gantt-group-bar { position: absolute; top: 50%; transform: translateY(-50%); height: 8px; border-radius: 4px; opacity: .45; }
+
 .gantt-wrap { background: var(--surface); border: 1px solid var(--border); border-bottom: none; border-radius: 12px 12px 0 0; overflow-x: auto; overflow-y: hidden; padding: 14px; }
 .gantt-vresizer { height: 14px; display: flex; align-items: center; justify-content: center; cursor: row-resize; user-select: none; background: var(--surface); border: 1px solid var(--border); border-top: none; border-radius: 0 0 12px 12px; margin-bottom: 20px; }
 .gantt-vresizer::after { content: ""; width: 48px; height: 4px; border-radius: 3px; background: var(--border-strong); }
