@@ -14,6 +14,9 @@ let taskFilters = { phase: "", status: "", owner: "" };
 // gantt and table collapse state are independent: collapsing a 구분 in one view doesn't affect the other.
 let collapsedPhasesGantt = new Set();
 let collapsedPhasesTable = new Set();
+let collapsedOwnersTable = new Set();
+// which desktop board section is showing: "all" | "gantt" | "table" | "owner" (담당자별 업무)
+let viewMode = "all";
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
@@ -98,9 +101,11 @@ function renderFilterOptions() {
   ["#filterStatus", "#filterStatusMobile"].forEach(sel => { $(sel).value = taskFilters.status; });
 }
 function applyTaskFilters() {
+  const byOwner = viewMode === "owner";
   $$("#taskTbody tr[data-id]").forEach(row => {
     const t = state.tasks.find(x => x.id === row.dataset.id);
-    row.hidden = !(t && taskMatchesFilters(t)) || (t && isPhaseCollapsed(t.phase_name, "table"));
+    const groupCollapsed = t && (byOwner ? isOwnerCollapsed(t.owner) : isPhaseCollapsed(t.phase_name, "table"));
+    row.hidden = !(t && taskMatchesFilters(t)) || groupCollapsed;
   });
   $$("#cardList .task-card").forEach(card => {
     const t = state.tasks.find(x => x.id === card.dataset.id);
@@ -267,13 +272,17 @@ async function enterProject(projectId) {
   if (!state.project) { location.href = "./"; return; }
   collapsedPhasesGantt = loadCollapsedPhases(state.project.id, "gantt");
   collapsedPhasesTable = loadCollapsedPhases(state.project.id, "table");
+  collapsedOwnersTable = loadCollapsedOwners(state.project.id);
+  viewMode = loadViewMode(state.project.id);
   logPageView("project", projectId);
   await loadTasks();
   state.editMode = state.project.mode === "edit";
   $("#app").hidden = false;
   renderAll();
+  applyViewMode();
   wireStaticUI();
   wireModeToggle();
+  wireViewNav();
   subscribeRealtime();
 }
 
@@ -571,12 +580,13 @@ function wirePhaseToggles(container, view) {
     btn.addEventListener("click", () => togglePhase(holder.dataset.phase, view));
   });
 }
-function buildPhaseHeaderInnerHtml(g, collapsed) {
+function buildPhaseHeaderInnerHtml(g, collapsed, showDot = true) {
   const total = g.tasks.length;
   const done = g.tasks.filter(t => deriveTaskStatus(t).key === "done").length;
+  const dotHtml = showDot ? `<span class="phase-group-dot" style="background:${g.color || PALETTE[0]}"></span>` : "";
   return `
     <span class="phase-group-caret ${collapsed ? "collapsed" : ""}">▾</span>
-    <span class="phase-group-dot" style="background:${g.color || PALETTE[0]}"></span>
+    ${dotHtml}
     <span class="phase-group-name">${escapeHtml(g.key || "구분")}</span>
     <span class="phase-group-count">${done}/${total}</span>
   `;
@@ -584,6 +594,50 @@ function buildPhaseHeaderInnerHtml(g, collapsed) {
 function buildPhaseGroupHeaderRowHtml(g, collapsed) {
   return `<tr class="phase-group-row" data-phase="${escapeHtml(g.key)}">
     <td colspan="11"><button type="button" class="phase-group-toggle">${buildPhaseHeaderInnerHtml(g, collapsed)}</button></td>
+  </tr>`;
+}
+
+// ---------- 담당자 grouping / collapse (table's "담당자별 업무" view) ----------
+function groupTasksByOwner(tasks) {
+  const order = [];
+  const map = new Map();
+  tasks.forEach(t => {
+    const key = (t.owner || "").trim() || "미배정";
+    if (!map.has(key)) { map.set(key, { key, tasks: [] }); order.push(key); }
+    map.get(key).tasks.push(t);
+  });
+  return order.map(k => map.get(k));
+}
+function ownerKeyOf(owner) {
+  return (owner || "").trim() || "미배정";
+}
+function isOwnerCollapsed(owner) {
+  return collapsedOwnersTable.has(ownerKeyOf(owner));
+}
+function loadCollapsedOwners(pid) {
+  try { return new Set(JSON.parse(localStorage.getItem(`collapsedOwners_table_${pid}`) || "[]")); } catch (e) { return new Set(); }
+}
+function saveCollapsedOwners() {
+  if (!state.project) return;
+  try { localStorage.setItem(`collapsedOwners_table_${state.project.id}`, JSON.stringify([...collapsedOwnersTable])); } catch (e) {}
+}
+function toggleOwnerGroup(key) {
+  if (collapsedOwnersTable.has(key)) collapsedOwnersTable.delete(key);
+  else collapsedOwnersTable.add(key);
+  saveCollapsedOwners();
+  renderTable();
+  applyTaskFilters();
+}
+function wireOwnerToggles(container) {
+  container.querySelectorAll(".phase-group-toggle").forEach(btn => {
+    const holder = btn.closest("[data-owner]");
+    if (!holder) return;
+    btn.addEventListener("click", () => toggleOwnerGroup(holder.dataset.owner));
+  });
+}
+function buildOwnerGroupHeaderRowHtml(g, collapsed) {
+  return `<tr class="phase-group-row" data-owner="${escapeHtml(g.key)}">
+    <td colspan="11"><button type="button" class="phase-group-toggle">${buildPhaseHeaderInnerHtml(g, collapsed, false)}</button></td>
   </tr>`;
 }
 
@@ -637,10 +691,12 @@ function patchTaskRow(taskId) {
 function renderTable() {
   const tbody = $("#taskTbody");
   const dis = !state.editMode ? "disabled" : "";
-  const groups = groupTasksByPhase(state.tasks);
+  const byOwner = viewMode === "owner";
+  const groups = byOwner ? groupTasksByOwner(state.tasks) : groupTasksByPhase(state.tasks);
   tbody.innerHTML = groups.map(g => {
-    const collapsed = isPhaseCollapsed(g.key, "table");
-    return buildPhaseGroupHeaderRowHtml(g, collapsed) + g.tasks.map(t => buildTaskRowHtml(t, dis)).join("");
+    const collapsed = byOwner ? isOwnerCollapsed(g.key) : isPhaseCollapsed(g.key, "table");
+    const headerHtml = byOwner ? buildOwnerGroupHeaderRowHtml(g, collapsed) : buildPhaseGroupHeaderRowHtml(g, collapsed);
+    return headerHtml + g.tasks.map(t => buildTaskRowHtml(t, dis)).join("");
   }).join("") + (state.editMode ? `
     <tr class="add-task-row">
       <td colspan="11"><button type="button" class="add-task-row-btn" id="addTaskBtnDesktop">+ 업무 추가</button></td>
@@ -648,7 +704,7 @@ function renderTable() {
   ` : "");
 
   tbody.querySelectorAll("tr[data-id]").forEach(wireTaskRowEl);
-  wirePhaseToggles(tbody, "table");
+  if (byOwner) wireOwnerToggles(tbody); else wirePhaseToggles(tbody, "table");
   const addBtn = tbody.querySelector("#addTaskBtnDesktop");
   if (addBtn) addBtn.addEventListener("click", addTask);
   wireDragReorder(tbody);
@@ -680,70 +736,6 @@ function renderGantt() {
   wrap.innerHTML = buildGanttHtml(state.tasks, DAYPX);
   wireGanttResizer();
   wirePhaseToggles(wrap, "gantt");
-  applyGanttPanelSizing();
-}
-const GANTT_ROW_DEFAULT_H = 36;
-const GANTT_ROW_MIN_H = 22;
-function loadGanttPanelHeight() {
-  const v = parseInt(localStorage.getItem("ganttPanelHeight") || "", 10);
-  return Number.isFinite(v) && v > 0 ? v : null;
-}
-let ganttPanelHeight = loadGanttPanelHeight();
-function applyGanttPanelSizing() {
-  const wrap = $("#ganttWrap");
-  const ganttEl = $("#gantt");
-  if (!wrap || !ganttEl) return;
-  if (!ganttPanelHeight) {
-    wrap.style.height = "";
-    ganttEl.style.removeProperty("--gantt-row-h");
-    return;
-  }
-  const monthRow = ganttEl.querySelector(".gantt-month-row");
-  const ruler = ganttEl.querySelector(".gantt-ruler");
-  const headerH = (monthRow ? monthRow.offsetHeight : 0) + (ruler ? ruler.offsetHeight : 0);
-  const rowCount = ganttEl.querySelectorAll(".gantt-row").length;
-
-  // The horizontal date scrollbar (from overflow-x: auto) eats into the
-  // wrap's own height, so it can cover the last row at the smallest size.
-  // Measure it and reserve that space before computing row height.
-  wrap.style.height = ganttPanelHeight + "px";
-  const scrollbarH = Math.max(0, wrap.offsetHeight - wrap.clientHeight);
-  const cs = getComputedStyle(wrap);
-  const vPadding = parseFloat(cs.paddingTop || "0") + parseFloat(cs.paddingBottom || "0");
-
-  const availableForRows = Math.max(0, ganttPanelHeight - headerH - scrollbarH - vPadding);
-  const rowH = rowCount ? Math.max(GANTT_ROW_MIN_H, Math.min(GANTT_ROW_DEFAULT_H, availableForRows / rowCount)) : GANTT_ROW_DEFAULT_H;
-  ganttEl.style.setProperty("--gantt-row-h", rowH + "px");
-}
-function wireGanttVResizer() {
-  const handle = $("#ganttVResizer");
-  if (!handle) return;
-  handle.addEventListener("mousedown", (e) => {
-    e.preventDefault();
-    const startY = e.clientY;
-    const wrap = $("#ganttWrap");
-    const startHeight = ganttPanelHeight || wrap.getBoundingClientRect().height;
-    handle.classList.add("active");
-    document.body.style.cursor = "row-resize";
-    const onMove = (ev) => {
-      ganttPanelHeight = Math.max(60, Math.round(startHeight + (ev.clientY - startY)));
-      applyGanttPanelSizing();
-    };
-    const onUp = () => {
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
-      document.body.style.cursor = "";
-      handle.classList.remove("active");
-      try { localStorage.setItem("ganttPanelHeight", String(ganttPanelHeight)); } catch (e) {}
-    };
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
-  });
-  handle.addEventListener("dblclick", () => {
-    ganttPanelHeight = null;
-    try { localStorage.removeItem("ganttPanelHeight"); } catch (e) {}
-    applyGanttPanelSizing();
-  });
 }
 function loadGanttLabelWidth() {
   const v = parseInt(localStorage.getItem("ganttLabelWidth") || "", 10);
@@ -804,7 +796,7 @@ function buildGanttTaskRowHtml(t, minDate, daypx, trackWidth, rowWidth) {
   const ownerText = t.owner ? escapeHtml(t.owner) : "미배정";
   return `<div class="gantt-row" style="grid-template-columns:${ganttLabelWidth}px 1fr;width:${rowWidth}px">
     <div class="gantt-row-label">
-      <div class="gantt-row-name-box" style="background:${t.phase_color}" title="${escapeHtml(t.phase_name || "구분")} · ${escapeHtml(t.name || "")}">${escapeHtml(t.name || "(제목 없음)")}</div>
+      <div class="gantt-row-name-box" title="${escapeHtml(t.phase_name || "구분")} · ${escapeHtml(t.name || "")}">${escapeHtml(t.name || "(제목 없음)")}</div>
       <div class="gantt-row-owner-col">${ownerText}</div>
       <div class="gantt-row-status-col"><span class="task-status-badge ${ts.key}">${ts.label}</span></div>
     </div>
@@ -1042,9 +1034,50 @@ function wireColumnResize() {
   });
 }
 
+// ---------- desktop view switcher (전체업무 / 간트차트 / 업무 목록 / 담당자별 업무) ----------
+const VIEW_MODES = ["all", "gantt", "table", "owner"];
+function loadViewMode(pid) {
+  const v = localStorage.getItem("viewMode_" + pid);
+  return VIEW_MODES.includes(v) ? v : "all";
+}
+function saveViewMode() {
+  if (!state.project) return;
+  try { localStorage.setItem("viewMode_" + state.project.id, viewMode); } catch (e) {}
+}
+function applyViewMode() {
+  const showGantt = viewMode === "all" || viewMode === "gantt";
+  const showTable = viewMode !== "gantt";
+  $("#ganttViewGroup").hidden = !showGantt;
+  $("#tableViewGroup").hidden = !showTable;
+  $("#tableSectionTitle").textContent = viewMode === "owner" ? "담당자별 업무" : "업무 목록";
+  $$(".view-nav-item").forEach(btn => btn.classList.toggle("active", btn.dataset.view === viewMode));
+  renderTable();
+}
+function setViewMode(mode) {
+  if (!VIEW_MODES.includes(mode)) return;
+  viewMode = mode;
+  saveViewMode();
+  applyViewMode();
+  closeViewNav();
+}
+function openViewNav() {
+  $("#viewNavPanel").hidden = false;
+  $("#viewNavBackdrop").hidden = false;
+}
+function closeViewNav() {
+  $("#viewNavPanel").hidden = true;
+  $("#viewNavBackdrop").hidden = true;
+}
+function wireViewNav() {
+  $("#viewNavToggleBtn").addEventListener("click", () => {
+    if ($("#viewNavPanel").hidden) openViewNav(); else closeViewNav();
+  });
+  $("#viewNavBackdrop").addEventListener("click", closeViewNav);
+  $$(".view-nav-item").forEach(btn => btn.addEventListener("click", () => setViewMode(btn.dataset.view)));
+}
+
 // ---------- mobile gantt overlay ----------
 function wireStaticUI() {
-  wireGanttVResizer();
   const wireFilterPair = (key, ids) => {
     ids.forEach(id => {
       $(id).addEventListener("change", () => {

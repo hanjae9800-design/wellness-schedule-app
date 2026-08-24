@@ -41,6 +41,17 @@
 
 <div id="app" class="app" hidden>
 
+  <button type="button" class="view-nav-toggle-btn" id="viewNavToggleBtn" title="화면 보기 전환">☰</button>
+  <div class="view-nav-backdrop" id="viewNavBackdrop" hidden></div>
+  <nav class="view-nav-panel" id="viewNavPanel" hidden>
+    <div class="view-nav-head">보기 전환</div>
+    <button type="button" class="view-nav-item" data-view="all">전체업무</button>
+    <button type="button" class="view-nav-item" data-view="gantt">간트차트</button>
+    <button type="button" class="view-nav-item" data-view="table">업무 목록</button>
+    <button type="button" class="view-nav-item" data-view="owner">담당자별 업무</button>
+  </nav>
+
+
   <div class="sync-banner" id="syncBanner" hidden></div>
 
   <header class="page-head">
@@ -80,15 +91,17 @@
   <div class="owner-summary" id="ownerSummary" hidden></div>
 
   <section class="board desktop-only">
-    <div class="board-toolbar">
-      <div class="legend" id="legendDesktop"></div>
+    <div class="view-group" id="ganttViewGroup">
+      <div class="board-toolbar">
+        <div class="legend" id="legendDesktop"></div>
+      </div>
+      <div class="gantt-wrap" id="ganttWrap">
+        <div class="gantt" id="gantt"></div>
+      </div>
     </div>
-    <div class="gantt-wrap" id="ganttWrap">
-      <div class="gantt" id="gantt"></div>
-    </div>
-    <div class="gantt-vresizer" id="ganttVResizer" title="드래그해서 간트차트 세로 길이 조정 (더블클릭: 원래대로)"></div>
+    <div class="view-group" id="tableViewGroup">
     <div class="section-head">
-      <h2>업무 목록</h2>
+      <h2 id="tableSectionTitle">업무 목록</h2>
     </div>
     <div class="table-scroll">
       <table class="task-table" id="taskTable">
@@ -128,6 +141,7 @@
         </thead>
         <tbody id="taskTbody"></tbody>
       </table>
+    </div>
     </div>
   </section>
 
