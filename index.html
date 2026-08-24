@@ -41,10 +41,11 @@
 
 <div id="app" class="app" hidden>
 
-  <a href="./" class="home-btn" title="목록으로">🏠</a>
   <button type="button" class="view-nav-toggle-btn" id="viewNavToggleBtn" title="화면 보기 전환">☰</button>
   <div class="view-nav-backdrop" id="viewNavBackdrop" hidden></div>
   <nav class="view-nav-panel" id="viewNavPanel" hidden>
+    <a href="./" class="view-nav-item view-nav-home"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 0 0 1 1h3v-6h6v6h3a1 1 0 0 0 1-1V10"/></svg> 목록</a>
+    <div class="view-nav-divider"></div>
     <button type="button" class="view-nav-item" data-view="all">전체업무</button>
     <button type="button" class="view-nav-item" data-view="gantt">간트차트</button>
     <button type="button" class="view-nav-item" data-view="table">업무 목록</button>

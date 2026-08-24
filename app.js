@@ -1050,7 +1050,7 @@ function applyViewMode() {
   $("#ganttViewGroup").hidden = !showGantt;
   $("#tableViewGroup").hidden = !showTable;
   $("#tableSectionTitle").textContent = viewMode === "owner" ? "담당자별 업무" : "업무 목록";
-  $$(".view-nav-item").forEach(btn => btn.classList.toggle("active", btn.dataset.view === viewMode));
+  $$(".view-nav-item[data-view]").forEach(btn => btn.classList.toggle("active", btn.dataset.view === viewMode));
   renderTable();
 }
 function setViewMode(mode) {
@@ -1073,7 +1073,7 @@ function wireViewNav() {
     if ($("#viewNavPanel").hidden) openViewNav(); else closeViewNav();
   });
   $("#viewNavBackdrop").addEventListener("click", closeViewNav);
-  $$(".view-nav-item").forEach(btn => btn.addEventListener("click", () => setViewMode(btn.dataset.view)));
+  $$(".view-nav-item[data-view]").forEach(btn => btn.addEventListener("click", () => setViewMode(btn.dataset.view)));
 }
 
 // ---------- mobile gantt overlay ----------
