@@ -11,7 +11,9 @@ const DAYPX = 20;
 let state = { project: null, tasks: [], editMode: false };
 let saveTimers = new Map();
 let taskFilters = { phase: "", status: "", owner: "" };
-let collapsedPhases = new Set();
+// gantt and table collapse state are independent: collapsing a 구분 in one view doesn't affect the other.
+let collapsedPhasesGantt = new Set();
+let collapsedPhasesTable = new Set();
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
@@ -98,7 +100,7 @@ function renderFilterOptions() {
 function applyTaskFilters() {
   $$("#taskTbody tr[data-id]").forEach(row => {
     const t = state.tasks.find(x => x.id === row.dataset.id);
-    row.hidden = !(t && taskMatchesFilters(t)) || (t && isPhaseCollapsed(t.phase_name));
+    row.hidden = !(t && taskMatchesFilters(t)) || (t && isPhaseCollapsed(t.phase_name, "table"));
   });
   $$("#cardList .task-card").forEach(card => {
     const t = state.tasks.find(x => x.id === card.dataset.id);
@@ -263,7 +265,8 @@ function wireLandingUI() {
 async function enterProject(projectId) {
   await loadProject(projectId);
   if (!state.project) { location.href = "./"; return; }
-  collapsedPhases = loadCollapsedPhases(state.project.id);
+  collapsedPhasesGantt = loadCollapsedPhases(state.project.id, "gantt");
+  collapsedPhasesTable = loadCollapsedPhases(state.project.id, "table");
   logPageView("project", projectId);
   await loadTasks();
   state.editMode = state.project.mode === "edit";
@@ -537,29 +540,35 @@ function groupTasksByPhase(tasks) {
   });
   return order.map(k => map.get(k));
 }
-function isPhaseCollapsed(phaseName) {
-  return collapsedPhases.has(phaseKeyOf(phaseName));
+function isPhaseCollapsed(phaseName, view) {
+  const set = view === "gantt" ? collapsedPhasesGantt : collapsedPhasesTable;
+  return set.has(phaseKeyOf(phaseName));
 }
-function loadCollapsedPhases(pid) {
-  try { return new Set(JSON.parse(localStorage.getItem("collapsedPhases_" + pid) || "[]")); } catch (e) { return new Set(); }
+function loadCollapsedPhases(pid, view) {
+  try { return new Set(JSON.parse(localStorage.getItem(`collapsedPhases_${view}_${pid}`) || "[]")); } catch (e) { return new Set(); }
 }
-function saveCollapsedPhases() {
+function saveCollapsedPhases(view) {
   if (!state.project) return;
-  try { localStorage.setItem("collapsedPhases_" + state.project.id, JSON.stringify([...collapsedPhases])); } catch (e) {}
+  const set = view === "gantt" ? collapsedPhasesGantt : collapsedPhasesTable;
+  try { localStorage.setItem(`collapsedPhases_${view}_${state.project.id}`, JSON.stringify([...set])); } catch (e) {}
 }
-function togglePhase(key) {
-  if (collapsedPhases.has(key)) collapsedPhases.delete(key);
-  else collapsedPhases.add(key);
-  saveCollapsedPhases();
-  renderTable();
-  renderGantt();
-  renderCards();
+function togglePhase(key, view) {
+  const set = view === "gantt" ? collapsedPhasesGantt : collapsedPhasesTable;
+  if (set.has(key)) set.delete(key);
+  else set.add(key);
+  saveCollapsedPhases(view);
+  if (view === "gantt") {
+    renderGantt();
+  } else {
+    renderTable();
+    applyTaskFilters();
+  }
 }
-function wirePhaseToggles(container) {
+function wirePhaseToggles(container, view) {
   container.querySelectorAll(".phase-group-toggle").forEach(btn => {
     const holder = btn.closest("[data-phase]");
     if (!holder) return;
-    btn.addEventListener("click", () => togglePhase(holder.dataset.phase));
+    btn.addEventListener("click", () => togglePhase(holder.dataset.phase, view));
   });
 }
 function buildPhaseHeaderInnerHtml(g, collapsed) {
@@ -630,7 +639,7 @@ function renderTable() {
   const dis = !state.editMode ? "disabled" : "";
   const groups = groupTasksByPhase(state.tasks);
   tbody.innerHTML = groups.map(g => {
-    const collapsed = isPhaseCollapsed(g.key);
+    const collapsed = isPhaseCollapsed(g.key, "table");
     return buildPhaseGroupHeaderRowHtml(g, collapsed) + g.tasks.map(t => buildTaskRowHtml(t, dis)).join("");
   }).join("") + (state.editMode ? `
     <tr class="add-task-row">
@@ -639,7 +648,7 @@ function renderTable() {
   ` : "");
 
   tbody.querySelectorAll("tr[data-id]").forEach(wireTaskRowEl);
-  wirePhaseToggles(tbody);
+  wirePhaseToggles(tbody, "table");
   const addBtn = tbody.querySelector("#addTaskBtnDesktop");
   if (addBtn) addBtn.addEventListener("click", addTask);
   wireDragReorder(tbody);
@@ -670,7 +679,7 @@ function renderGantt() {
   if (!state.tasks.length) { wrap.innerHTML = `<div style="color:var(--ink-muted);font-size:12px;padding:10px;">일정을 추가하면 타임라인이 표시됩니다.</div>`; return; }
   wrap.innerHTML = buildGanttHtml(state.tasks, DAYPX);
   wireGanttResizer();
-  wirePhaseToggles(wrap);
+  wirePhaseToggles(wrap, "gantt");
   applyGanttPanelSizing();
 }
 const GANTT_ROW_DEFAULT_H = 36;
@@ -838,7 +847,7 @@ function buildGanttHtml(tasks, daypx, grouped = true) {
   if (grouped) {
     const groups = groupTasksByPhase(tasks);
     groups.forEach(g => {
-      const collapsed = isPhaseCollapsed(g.key);
+      const collapsed = isPhaseCollapsed(g.key, "gantt");
       const groupColor = g.color || PALETTE[0];
       const groupDated = g.tasks.filter(t => t.start_date && t.end_date);
       let groupBarHtml = "";

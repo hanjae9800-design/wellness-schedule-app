@@ -184,18 +184,18 @@ select.task-status-badge:disabled { cursor: default; opacity: .85; }
 
 /* ---- phase(구분) group header / collapse ---- */
 .phase-group-row td { padding: 0; border-bottom: none; }
-.phase-group-toggle { display: flex; align-items: center; gap: 8px; width: 100%; background: var(--surface-alt); border: none; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border-strong); padding: 8px 12px; font: inherit; font-weight: 700; font-size: 12.5px; color: var(--ink); cursor: pointer; text-align: left; }
+.phase-group-toggle { display: flex; align-items: center; gap: 10px; width: 100%; background: var(--surface-alt); border: none; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border-strong); padding: 13px 16px; font: inherit; font-weight: 700; font-size: 14px; color: var(--ink); cursor: pointer; text-align: left; }
 .phase-group-toggle:hover { background: var(--page); }
 .phase-group-row:first-child .phase-group-toggle { border-top: none; }
-.phase-group-caret { display: inline-block; font-size: 10px; color: var(--ink-muted); transition: transform .15s ease; flex: none; }
+.phase-group-caret { display: inline-block; font-size: 14px; color: var(--ink-muted); transition: transform .15s ease; flex: none; }
 .phase-group-caret.collapsed { transform: rotate(-90deg); }
-.phase-group-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.phase-group-dot { width: 13px; height: 13px; border-radius: 50%; flex: none; }
 .phase-group-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.phase-group-count { flex: none; font-size: 11px; font-weight: 700; color: var(--ink-muted); background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px; }
+.phase-group-count { flex: none; font-size: 12.5px; font-weight: 700; color: var(--ink-muted); background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; }
 
-.gantt-row.gantt-phase-row { height: auto; min-height: 34px; border-bottom: 2px solid var(--border-strong); }
+.gantt-row.gantt-phase-row { height: auto; min-height: 46px; border-bottom: 2px solid var(--border-strong); }
 .gantt-phase-label { display: block; padding: 0; }
-.gantt-phase-label .phase-group-toggle { height: 100%; min-height: 34px; border: none; padding: 7px 12px; font-size: 12.5px; font-weight: 800; letter-spacing: .01em; color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,0.25); }
+.gantt-phase-label .phase-group-toggle { height: 100%; min-height: 46px; border: none; padding: 13px 16px; font-size: 14px; font-weight: 800; letter-spacing: .01em; color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,0.25); }
 .gantt-phase-label .phase-group-toggle:hover { filter: brightness(1.08); }
 .gantt-phase-label .phase-group-caret { color: rgba(255,255,255,0.85); }
 .gantt-phase-label .phase-group-dot { display: none; }
