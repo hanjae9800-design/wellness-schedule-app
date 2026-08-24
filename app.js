@@ -102,7 +102,7 @@ function applyTaskFilters() {
   });
   $$("#cardList .task-card").forEach(card => {
     const t = state.tasks.find(x => x.id === card.dataset.id);
-    card.hidden = !(t && taskMatchesFilters(t)) || (t && isPhaseCollapsed(t.phase_name));
+    card.hidden = !(t && taskMatchesFilters(t));
   });
 }
 function getAssigneeOptions() {
@@ -554,10 +554,6 @@ function togglePhase(key) {
   renderTable();
   renderGantt();
   renderCards();
-  if (!$("#ganttOverlay").hidden) {
-    $("#ganttOverlayBody").innerHTML = buildGanttHtml(state.tasks, 14);
-    wirePhaseToggles($("#ganttOverlayBody"));
-  }
 }
 function wirePhaseToggles(container) {
   container.querySelectorAll(".phase-group-toggle").forEach(btn => {
@@ -580,11 +576,6 @@ function buildPhaseGroupHeaderRowHtml(g, collapsed) {
   return `<tr class="phase-group-row" data-phase="${escapeHtml(g.key)}">
     <td colspan="11"><button type="button" class="phase-group-toggle">${buildPhaseHeaderInnerHtml(g, collapsed)}</button></td>
   </tr>`;
-}
-function buildPhaseGroupHeaderCardHtml(g, collapsed) {
-  return `<div class="phase-group-row card-group-row" data-phase="${escapeHtml(g.key)}">
-    <button type="button" class="phase-group-toggle">${buildPhaseHeaderInnerHtml(g, collapsed)}</button>
-  </div>`;
 }
 
 function buildTaskRowHtml(t, dis) {
@@ -789,7 +780,33 @@ function buildGanttMonthSegments(minDate, totalDays) {
   }
   return segments;
 }
-function buildGanttHtml(tasks, daypx) {
+function buildGanttTaskRowHtml(t, minDate, daypx, trackWidth, rowWidth) {
+  if (!t.start_date || !t.end_date) return "";
+  const off = daysBetween(minDate, t.start_date);
+  const len = Math.max(1, daysBetween(t.start_date, t.end_date) + 1);
+  const ts = deriveTaskStatus(t);
+  let barColor = t.phase_color;
+  if (ts.key === "delayed") barColor = "var(--delay)";
+  else if (ts.key === "done") barColor = "var(--ink-muted)";
+  else if (ts.key === "doing") barColor = "var(--accent)";
+  const barLeft = off * daypx;
+  const barWidth = len * daypx - 3;
+  const labelHtml = ts.key === "todo" ? "" : `<span class="gantt-bar-label">${ts.label}</span>`;
+  const ownerText = t.owner ? escapeHtml(t.owner) : "미배정";
+  return `<div class="gantt-row" style="grid-template-columns:${ganttLabelWidth}px 1fr;width:${rowWidth}px">
+    <div class="gantt-row-label">
+      <div class="gantt-row-name-box" style="background:${t.phase_color}" title="${escapeHtml(t.phase_name || "구분")} · ${escapeHtml(t.name || "")}">${escapeHtml(t.name || "(제목 없음)")}</div>
+      <div class="gantt-row-owner-col">${ownerText}</div>
+      <div class="gantt-row-status-col"><span class="task-status-badge ${ts.key}">${ts.label}</span></div>
+    </div>
+    <div class="gantt-track" style="width:${trackWidth}px">
+      <div class="gantt-bar ${ts.key}" style="left:${barLeft}px;width:${barWidth}px;background:${barColor}" title="${escapeHtml(t.name)}">${labelHtml}</div>
+    </div>
+  </div>`;
+}
+// grouped=true shows collapsible 구분 group headers (desktop board); grouped=false renders
+// a flat list with no headers (mobile timeline overlay doesn't have the grouping feature yet).
+function buildGanttHtml(tasks, daypx, grouped = true) {
   const dated = tasks.filter(t => t.start_date && t.end_date);
   if (!dated.length) return `<div style="color:var(--ink-muted);font-size:12px;padding:10px;">시작일/종료일을 입력하면 타임라인이 표시됩니다.</div>`;
   const minDate = dated.reduce((m, t) => t.start_date < m ? t.start_date : m, dated[0].start_date);
@@ -818,51 +835,33 @@ function buildGanttHtml(tasks, daypx) {
     </div>
   </div>`;
 
-  const groups = groupTasksByPhase(tasks);
-  groups.forEach(g => {
-    const collapsed = isPhaseCollapsed(g.key);
-    const groupDated = g.tasks.filter(t => t.start_date && t.end_date);
-    let groupBarHtml = "";
-    if (groupDated.length) {
-      const gMin = groupDated.reduce((m, t) => t.start_date < m ? t.start_date : m, groupDated[0].start_date);
-      const gMax = groupDated.reduce((m, t) => t.end_date > m ? t.end_date : m, groupDated[0].end_date);
-      const gOff = daysBetween(minDate, gMin);
-      const gLen = Math.max(1, daysBetween(gMin, gMax) + 1);
-      groupBarHtml = `<div class="gantt-group-bar" style="left:${gOff * daypx}px;width:${gLen * daypx - 3}px;background:${g.color || PALETTE[0]}"></div>`;
-    }
-    html += `<div class="gantt-row gantt-phase-row" data-phase="${escapeHtml(g.key)}" style="grid-template-columns:${ganttLabelWidth}px 1fr;width:${rowWidth}px">
-      <div class="gantt-row-label gantt-phase-label">
-        <button type="button" class="phase-group-toggle">${buildPhaseHeaderInnerHtml(g, collapsed)}</button>
-      </div>
-      <div class="gantt-track" style="width:${trackWidth}px">${groupBarHtml}</div>
-    </div>`;
-
-    if (collapsed) return;
-    g.tasks.forEach(t => {
-      if (!t.start_date || !t.end_date) return;
-      const off = daysBetween(minDate, t.start_date);
-      const len = Math.max(1, daysBetween(t.start_date, t.end_date) + 1);
-      const ts = deriveTaskStatus(t);
-      let barColor = t.phase_color;
-      if (ts.key === "delayed") barColor = "var(--delay)";
-      else if (ts.key === "done") barColor = "var(--ink-muted)";
-      else if (ts.key === "doing") barColor = "var(--accent)";
-      const barLeft = off * daypx;
-      const barWidth = len * daypx - 3;
-      const labelHtml = ts.key === "todo" ? "" : `<span class="gantt-bar-label">${ts.label}</span>`;
-      const ownerText = t.owner ? escapeHtml(t.owner) : "미배정";
-      html += `<div class="gantt-row" style="grid-template-columns:${ganttLabelWidth}px 1fr;width:${rowWidth}px">
-        <div class="gantt-row-label">
-          <div class="gantt-row-name-box" style="background:${t.phase_color}" title="${escapeHtml(t.phase_name || "구분")} · ${escapeHtml(t.name || "")}">${escapeHtml(t.name || "(제목 없음)")}</div>
-          <div class="gantt-row-owner-col">${ownerText}</div>
-          <div class="gantt-row-status-col"><span class="task-status-badge ${ts.key}">${ts.label}</span></div>
+  if (grouped) {
+    const groups = groupTasksByPhase(tasks);
+    groups.forEach(g => {
+      const collapsed = isPhaseCollapsed(g.key);
+      const groupColor = g.color || PALETTE[0];
+      const groupDated = g.tasks.filter(t => t.start_date && t.end_date);
+      let groupBarHtml = "";
+      if (groupDated.length) {
+        const gMin = groupDated.reduce((m, t) => t.start_date < m ? t.start_date : m, groupDated[0].start_date);
+        const gMax = groupDated.reduce((m, t) => t.end_date > m ? t.end_date : m, groupDated[0].end_date);
+        const gOff = daysBetween(minDate, gMin);
+        const gLen = Math.max(1, daysBetween(gMin, gMax) + 1);
+        groupBarHtml = `<div class="gantt-group-bar" style="left:${gOff * daypx}px;width:${gLen * daypx - 3}px;background:${groupColor}"></div>`;
+      }
+      html += `<div class="gantt-row gantt-phase-row" data-phase="${escapeHtml(g.key)}" style="grid-template-columns:${ganttLabelWidth}px 1fr;width:${rowWidth}px">
+        <div class="gantt-row-label gantt-phase-label" style="background:${groupColor}">
+          <button type="button" class="phase-group-toggle" style="background:${groupColor}">${buildPhaseHeaderInnerHtml(g, collapsed)}</button>
         </div>
-        <div class="gantt-track" style="width:${trackWidth}px">
-          <div class="gantt-bar ${ts.key}" style="left:${barLeft}px;width:${barWidth}px;background:${barColor}" title="${escapeHtml(t.name)}">${labelHtml}</div>
-        </div>
+        <div class="gantt-track" style="width:${trackWidth}px">${groupBarHtml}</div>
       </div>`;
+
+      if (collapsed) return;
+      g.tasks.forEach(t => { html += buildGanttTaskRowHtml(t, minDate, daypx, trackWidth, rowWidth); });
     });
-  });
+  } else {
+    tasks.forEach(t => { html += buildGanttTaskRowHtml(t, minDate, daypx, trackWidth, rowWidth); });
+  }
 
   let cursorDays = 0;
   monthSegments.forEach((s, i) => {
@@ -947,14 +946,9 @@ function patchTaskCard(taskId) {
 function renderCards() {
   const list = $("#cardList");
   const dis = !state.editMode ? "disabled" : "";
-  const groups = groupTasksByPhase(state.tasks);
-  list.innerHTML = groups.map(g => {
-    const collapsed = isPhaseCollapsed(g.key);
-    return buildPhaseGroupHeaderCardHtml(g, collapsed) + g.tasks.map(t => buildTaskCardHtml(t, state.tasks.indexOf(t), dis)).join("");
-  }).join("") + (state.editMode ? `<button type="button" class="add-task-card-btn" id="addTaskBtnMobile">+ 업무 추가</button>` : "");
+  list.innerHTML = state.tasks.map((t, idx) => buildTaskCardHtml(t, idx, dis)).join("") + (state.editMode ? `<button type="button" class="add-task-card-btn" id="addTaskBtnMobile">+ 업무 추가</button>` : "");
 
   list.querySelectorAll(".task-card").forEach(wireTaskCardEl);
-  wirePhaseToggles(list);
   const addBtnMobile = list.querySelector("#addTaskBtnMobile");
   if (addBtnMobile) addBtnMobile.addEventListener("click", addTask);
 
@@ -1068,8 +1062,7 @@ function wireStaticUI() {
     renderHeader();
   });
   $("#timelineOpenBtn").addEventListener("click", () => {
-    $("#ganttOverlayBody").innerHTML = buildGanttHtml(state.tasks, 14);
-    wirePhaseToggles($("#ganttOverlayBody"));
+    $("#ganttOverlayBody").innerHTML = buildGanttHtml(state.tasks, 14, false);
     $("#ganttOverlay").hidden = false;
   });
   $("#timelineCloseBtn").addEventListener("click", () => { $("#ganttOverlay").hidden = true; });
