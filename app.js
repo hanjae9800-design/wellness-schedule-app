@@ -595,7 +595,7 @@ function buildPhaseHeaderInnerHtml(g, collapsed, showDot = true) {
 }
 function buildPhaseGroupHeaderRowHtml(g, collapsed) {
   return `<tr class="phase-group-row" data-phase="${escapeHtml(g.key)}">
-    <td colspan="8"><button type="button" class="phase-group-toggle">${buildPhaseHeaderInnerHtml(g, collapsed)}</button></td>
+    <td colspan="7"><button type="button" class="phase-group-toggle">${buildPhaseHeaderInnerHtml(g, collapsed)}</button></td>
   </tr>`;
 }
 
@@ -639,7 +639,7 @@ function wireOwnerToggles(container) {
 }
 function buildOwnerGroupHeaderRowHtml(g, collapsed) {
   return `<tr class="phase-group-row" data-owner="${escapeHtml(g.key)}">
-    <td colspan="8"><button type="button" class="phase-group-toggle">${buildPhaseHeaderInnerHtml(g, collapsed, false)}</button></td>
+    <td colspan="7"><button type="button" class="phase-group-toggle">${buildPhaseHeaderInnerHtml(g, collapsed, false)}</button></td>
   </tr>`;
 }
 
@@ -656,7 +656,6 @@ function buildTaskRowHtml(t, dis) {
       <td><input value="${escapeHtml(t.name)}" data-field="name" data-id="${t.id}" ${dis} placeholder="업무명"></td>
       <td class="col-taskstatus">${buildTaskStatusSelectHtml(t, ts, dis)}</td>
       <td class="col-detail"><button type="button" class="detail-btn ${open ? "open" : ""}" data-action="detail" data-id="${t.id}"><span class="detail-car">▾</span> 세부내용</button></td>
-      <td><input value="${escapeHtml(t.dependency)}" data-field="dependency" data-id="${t.id}" ${dis} placeholder="-"></td>
       <td class="col-del">${state.editMode ? `<button class="del-btn" data-action="del" data-id="${t.id}">✕</button>` : ""}</td>
     </tr>
     ${buildTaskDetailRowHtml(t, dis, open)}
@@ -664,15 +663,20 @@ function buildTaskRowHtml(t, dis) {
 }
 function buildTaskDetailRowHtml(t, dis, open) {
   return `<tr class="task-detail-row" data-id="${t.id}" ${open ? "" : "hidden"}>
-    <td colspan="8">
+    <td colspan="7">
       <div class="task-detail-inner">
         <div class="task-detail-field"><label>담당자</label>${buildOwnerSelectHtml(t.owner, t.id, dis)}</div>
         <div class="task-detail-field"><label>시작일</label><input type="date" value="${t.start_date || ""}" data-field="start_date" data-id="${t.id}" ${dis}></div>
         <div class="task-detail-field"><label>종료일</label><input type="date" value="${t.end_date || ""}" data-field="end_date" data-id="${t.id}" ${dis}></div>
-        <div class="task-detail-field"><label>비고</label><input value="${escapeHtml(t.note)}" data-field="note" data-id="${t.id}" ${dis} placeholder="-"></div>
+        <div class="task-detail-field"><label>선행업무</label><textarea class="autosize-textarea" rows="1" data-field="dependency" data-id="${t.id}" ${dis} placeholder="-">${escapeHtml(t.dependency)}</textarea></div>
+        <div class="task-detail-field"><label>비고</label><textarea class="autosize-textarea" rows="1" data-field="note" data-id="${t.id}" ${dis} placeholder="-">${escapeHtml(t.note)}</textarea></div>
       </div>
     </td>
   </tr>`;
+}
+function autosizeTextarea(el) {
+  el.style.height = "auto";
+  el.style.height = el.scrollHeight + "px";
 }
 function toggleTaskDetail(id) {
   if (openDetailRows.has(id)) openDetailRows.delete(id);
@@ -683,15 +687,20 @@ function toggleTaskDetail(id) {
   const detailTr = tbody.querySelector(`tr.task-detail-row[data-id="${id}"]`);
   const isOpen = openDetailRows.has(id);
   if (btn) btn.classList.toggle("open", isOpen);
-  if (detailTr) detailTr.hidden = !isOpen;
+  if (detailTr) {
+    detailTr.hidden = !isOpen;
+    if (isOpen) detailTr.querySelectorAll("textarea.autosize-textarea").forEach(autosizeTextarea);
+  }
 }
 function wireTaskRowEl(tr) {
-  tr.querySelectorAll("input,select").forEach(el => {
+  tr.querySelectorAll("input,select,textarea").forEach(el => {
     el.addEventListener("change", () => {
       updateTaskField(el.dataset.id, el.dataset.field, el.value);
       if (["status", "start_date", "end_date", "phase_name"].includes(el.dataset.field)) refreshTaskDerivedViews();
     });
   });
+  tr.querySelectorAll("textarea.autosize-textarea").forEach(el => el.addEventListener("input", () => autosizeTextarea(el)));
+  if (!tr.hidden) tr.querySelectorAll("textarea.autosize-textarea").forEach(autosizeTextarea);
   tr.querySelectorAll('[data-action="del"]').forEach(el => el.addEventListener("click", () => deleteTask(el.dataset.id)));
   tr.querySelectorAll('[data-action="detail"]').forEach(el => el.addEventListener("click", () => toggleTaskDetail(el.dataset.id)));
   tr.querySelectorAll('[data-action="color"]').forEach(el => el.addEventListener("click", (e) => {
@@ -729,7 +738,7 @@ function renderTable() {
     return headerHtml + g.tasks.map(t => buildTaskRowHtml(t, dis)).join("");
   }).join("") + (state.editMode ? `
     <tr class="add-task-row">
-      <td colspan="8"><button type="button" class="add-task-row-btn" id="addTaskBtnDesktop">+ 업무 추가</button></td>
+      <td colspan="7"><button type="button" class="add-task-row-btn" id="addTaskBtnDesktop">+ 업무 추가</button></td>
     </tr>
   ` : "");
 
@@ -771,7 +780,7 @@ function wireDragReorder(tbody) {
 function renderGantt() {
   const wrap = $("#gantt");
   if (!state.tasks.length) { wrap.innerHTML = `<div style="color:var(--ink-muted);font-size:12px;padding:10px;">일정을 추가하면 타임라인이 표시됩니다.</div>`; return; }
-  wrap.innerHTML = buildGanttHtml(state.tasks, DAYPX);
+  wrap.innerHTML = buildGanttHtml(state.tasks, DAYPX, true, true);
   wireGanttResizer();
   wirePhaseToggles(wrap, "gantt");
 }
@@ -845,11 +854,20 @@ function buildGanttTaskRowHtml(t, minDate, daypx, trackWidth, rowWidth) {
 }
 // grouped=true shows collapsible 구분 group headers (desktop board); grouped=false renders
 // a flat list with no headers (mobile timeline overlay doesn't have the grouping feature yet).
-function buildGanttHtml(tasks, daypx, grouped = true) {
+// extendRange=true pads the timeline forward to span at least 3 months from the earliest task
+// (desktop only, for now) and switches the ruler to a daily tick per day instead of weekly.
+function buildGanttHtml(tasks, daypx, grouped = true, extendRange = false) {
   const dated = tasks.filter(t => t.start_date && t.end_date);
   if (!dated.length) return `<div style="color:var(--ink-muted);font-size:12px;padding:10px;">시작일/종료일을 입력하면 타임라인이 표시됩니다.</div>`;
   const minDate = dated.reduce((m, t) => t.start_date < m ? t.start_date : m, dated[0].start_date);
-  const maxDate = dated.reduce((m, t) => t.end_date > m ? t.end_date : m, dated[0].end_date);
+  let maxDate = dated.reduce((m, t) => t.end_date > m ? t.end_date : m, dated[0].end_date);
+  if (extendRange) {
+    const minEnd = new Date(minDate);
+    minEnd.setMonth(minEnd.getMonth() + 3);
+    minEnd.setDate(minEnd.getDate() - 1);
+    const minEndStr = minEnd.toISOString().slice(0, 10);
+    if (minEndStr > maxDate) maxDate = minEndStr;
+  }
   const totalDays = Math.max(1, daysBetween(minDate, maxDate) + 1);
   const trackWidth = totalDays * daypx;
   const rowWidth = ganttLabelWidth + trackWidth;
@@ -862,14 +880,16 @@ function buildGanttHtml(tasks, daypx, grouped = true) {
     </div>
   </div>`;
 
+  const rulerStep = extendRange ? 1 : 7;
   const rulerCols = [];
-  for (let i = 0; i <= totalDays; i += 7) rulerCols.push(i);
-  html += `<div class="gantt-ruler" style="width:${rowWidth}px">
+  for (let i = 0; i <= totalDays; i += rulerStep) rulerCols.push(i);
+  html += `<div class="gantt-ruler${extendRange ? " gantt-ruler-daily" : ""}" style="width:${rowWidth}px">
     <div class="gantt-spacer" style="width:${ganttLabelWidth}px"></div>
     <div class="gantt-ruler-track" style="width:${trackWidth}px">
       ${rulerCols.map(d => {
         const dt = new Date(minDate); dt.setDate(dt.getDate() + d);
-        return `<span style="width:${7 * daypx}px;flex:none">${dt.getMonth() + 1}/${dt.getDate()}</span>`;
+        const label = extendRange ? String(dt.getDate()) : `${dt.getMonth() + 1}/${dt.getDate()}`;
+        return `<span style="width:${rulerStep * daypx}px;flex:none">${label}</span>`;
       }).join("")}
     </div>
   </div>`;
@@ -1022,7 +1042,7 @@ function openColorPicker(anchorEl, taskId) {
 
 // ---------- task table column resize ----------
 const COL_WIDTH_KEY = "taskTableColWidths";
-const COL_MIN_WIDTH = { phase: 64, name: 90, owner: 90, dep: 60 };
+const COL_MIN_WIDTH = { phase: 64, name: 90, owner: 90 };
 const DEFAULT_MIN_COL_WIDTH = 50;
 function loadColWidths() {
   try { return JSON.parse(localStorage.getItem(COL_WIDTH_KEY) || "{}"); } catch (e) { return {}; }
