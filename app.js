@@ -589,14 +589,53 @@ function wirePhaseColorDots(container) {
     });
   });
 }
-function buildPhaseHeaderInnerHtml(g, collapsed, showDot = true) {
+function wirePhaseNameEdit(container) {
+  container.querySelectorAll(".phase-group-name-editable").forEach(span => {
+    span.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (state.editMode) startPhaseRename(span);
+    });
+  });
+}
+function startPhaseRename(span) {
+  const oldKey = span.dataset.phase;
+  const input = document.createElement("input");
+  input.className = "phase-group-name-input";
+  input.value = oldKey;
+  span.replaceWith(input);
+  input.focus();
+  input.select();
+  const commit = () => {
+    const newKey = input.value.trim();
+    input.replaceWith(span);
+    if (newKey && newKey !== oldKey) renamePhaseGroup(oldKey, newKey);
+  };
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); input.blur(); }
+    if (e.key === "Escape") { input.value = oldKey; input.blur(); }
+  });
+  input.addEventListener("blur", commit);
+  input.addEventListener("click", (e) => e.stopPropagation());
+}
+function renamePhaseGroup(oldKey, newKey) {
+  const groupTasks = state.tasks.filter(t => phaseKeyOf(t.phase_name) === oldKey);
+  groupTasks.forEach(t => updateTaskField(t.id, "phase_name", newKey));
+  [["table", collapsedPhasesTable], ["gantt", collapsedPhasesGantt]].forEach(([view, set]) => {
+    if (set.has(oldKey)) { set.delete(oldKey); set.add(newKey); saveCollapsedPhases(view); }
+  });
+  refreshTaskDerivedViews();
+}
+function buildPhaseHeaderInnerHtml(g, collapsed, showDot = true, nameEditable = false) {
   const total = g.tasks.length;
   const done = g.tasks.filter(t => deriveTaskStatus(t).key === "done").length;
   const dotHtml = showDot ? `<span class="phase-group-dot" style="background:${g.color || PALETTE[0]}"></span>` : "";
+  const nameHtml = nameEditable
+    ? `<span class="phase-group-name phase-group-name-editable" data-phase="${escapeHtml(g.key)}" title="클릭하면 이름을 바꿀 수 있어요">${escapeHtml(g.key || "구분")}</span>`
+    : `<span class="phase-group-name">${escapeHtml(g.key || "구분")}</span>`;
   return `
     <span class="phase-group-caret ${collapsed ? "collapsed" : ""}">▾</span>
     ${dotHtml}
-    <span class="phase-group-name">${escapeHtml(g.key || "구분")}</span>
+    ${nameHtml}
     <span class="phase-group-count">${done}/${total}</span>
   `;
 }
@@ -606,7 +645,7 @@ function buildPhaseGroupHeaderRowHtml(g, collapsed) {
     <td colspan="6">
       <div class="phase-group-toggle-wrap">
         ${dotBtn}
-        <button type="button" class="phase-group-toggle">${buildPhaseHeaderInnerHtml(g, collapsed, false)}</button>
+        <div class="phase-group-toggle" role="button" tabindex="0">${buildPhaseHeaderInnerHtml(g, collapsed, false, true)}</div>
       </div>
     </td>
   </tr>`;
@@ -662,9 +701,7 @@ function buildTaskRowHtml(t, dis) {
   return `
     <tr draggable="${state.editMode}" data-id="${t.id}">
       <td class="col-drag"><span class="drag-handle">⠿</span></td>
-      <td class="col-phase"><span class="phase-pill" style="background:${t.phase_color}">
-        <input value="${escapeHtml(t.phase_name)}" data-field="phase_name" data-id="${t.id}" ${dis}>
-      </span></td>
+      <td class="col-phase"></td>
       <td><input value="${escapeHtml(t.name)}" data-field="name" data-id="${t.id}" ${dis} placeholder="업무명"></td>
       <td class="col-taskstatus">${buildTaskStatusSelectHtml(t, ts, dis)}</td>
       <td class="col-detail"><button type="button" class="detail-btn ${open ? "open" : ""}" data-action="detail" data-id="${t.id}"><span class="detail-car">▾</span> 세부내용</button></td>
@@ -832,7 +869,7 @@ function renderTable() {
   ` : "");
 
   tbody.querySelectorAll("tr[data-id]").forEach(wireTaskRowEl);
-  if (byOwner) { wireOwnerToggles(tbody); } else { wirePhaseToggles(tbody, "table"); wirePhaseColorDots(tbody); }
+  if (byOwner) { wireOwnerToggles(tbody); } else { wirePhaseToggles(tbody, "table"); wirePhaseColorDots(tbody); wirePhaseNameEdit(tbody); }
   const addBtn = tbody.querySelector("#addTaskBtnDesktop");
   if (addBtn) addBtn.addEventListener("click", addTask);
   wireDragReorder(tbody);
@@ -1143,7 +1180,7 @@ function openPhaseColorPicker(anchorEl, phaseKey) {
 
 // ---------- task table column resize ----------
 const COL_WIDTH_KEY = "taskTableColWidths";
-const COL_MIN_WIDTH = { phase: 64, name: 90, owner: 90 };
+const COL_MIN_WIDTH = { phase: 40, name: 90, owner: 90 };
 const DEFAULT_MIN_COL_WIDTH = 50;
 function loadColWidths() {
   try { return JSON.parse(localStorage.getItem(COL_WIDTH_KEY) || "{}"); } catch (e) { return {}; }
