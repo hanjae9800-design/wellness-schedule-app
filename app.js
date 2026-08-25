@@ -17,6 +17,8 @@ let collapsedPhasesTable = new Set();
 let collapsedOwnersTable = new Set();
 // which desktop board section is showing: "all" | "gantt" | "table" | "owner" (담당자별 업무)
 let viewMode = "all";
+// task ids whose "세부내용" (담당자/시작일/종료일/비고) row is expanded in the 업무 목록 table; session-only, not persisted.
+let openDetailRows = new Set();
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
@@ -593,7 +595,7 @@ function buildPhaseHeaderInnerHtml(g, collapsed, showDot = true) {
 }
 function buildPhaseGroupHeaderRowHtml(g, collapsed) {
   return `<tr class="phase-group-row" data-phase="${escapeHtml(g.key)}">
-    <td colspan="11"><button type="button" class="phase-group-toggle">${buildPhaseHeaderInnerHtml(g, collapsed)}</button></td>
+    <td colspan="8"><button type="button" class="phase-group-toggle">${buildPhaseHeaderInnerHtml(g, collapsed)}</button></td>
   </tr>`;
 }
 
@@ -637,12 +639,13 @@ function wireOwnerToggles(container) {
 }
 function buildOwnerGroupHeaderRowHtml(g, collapsed) {
   return `<tr class="phase-group-row" data-owner="${escapeHtml(g.key)}">
-    <td colspan="11"><button type="button" class="phase-group-toggle">${buildPhaseHeaderInnerHtml(g, collapsed, false)}</button></td>
+    <td colspan="8"><button type="button" class="phase-group-toggle">${buildPhaseHeaderInnerHtml(g, collapsed, false)}</button></td>
   </tr>`;
 }
 
 function buildTaskRowHtml(t, dis) {
   const ts = deriveTaskStatus(t);
+  const open = openDetailRows.has(t.id);
   return `
     <tr draggable="${state.editMode}" data-id="${t.id}">
       <td class="col-drag"><span class="drag-handle">⠿</span></td>
@@ -652,14 +655,35 @@ function buildTaskRowHtml(t, dis) {
       </span></td>
       <td><input value="${escapeHtml(t.name)}" data-field="name" data-id="${t.id}" ${dis} placeholder="업무명"></td>
       <td class="col-taskstatus">${buildTaskStatusSelectHtml(t, ts, dis)}</td>
-      <td>${buildOwnerSelectHtml(t.owner, t.id, dis)}</td>
-      <td><input type="date" value="${t.start_date || ""}" data-field="start_date" data-id="${t.id}" ${dis}></td>
-      <td><input type="date" value="${t.end_date || ""}" data-field="end_date" data-id="${t.id}" ${dis}></td>
+      <td class="col-detail"><button type="button" class="detail-btn ${open ? "open" : ""}" data-action="detail" data-id="${t.id}"><span class="detail-car">▾</span> 세부내용</button></td>
       <td><input value="${escapeHtml(t.dependency)}" data-field="dependency" data-id="${t.id}" ${dis} placeholder="-"></td>
-      <td><input value="${escapeHtml(t.note)}" data-field="note" data-id="${t.id}" ${dis} placeholder="-"></td>
       <td class="col-del">${state.editMode ? `<button class="del-btn" data-action="del" data-id="${t.id}">✕</button>` : ""}</td>
     </tr>
+    ${buildTaskDetailRowHtml(t, dis, open)}
   `;
+}
+function buildTaskDetailRowHtml(t, dis, open) {
+  return `<tr class="task-detail-row" data-id="${t.id}" ${open ? "" : "hidden"}>
+    <td colspan="8">
+      <div class="task-detail-inner">
+        <div class="task-detail-field"><label>담당자</label>${buildOwnerSelectHtml(t.owner, t.id, dis)}</div>
+        <div class="task-detail-field"><label>시작일</label><input type="date" value="${t.start_date || ""}" data-field="start_date" data-id="${t.id}" ${dis}></div>
+        <div class="task-detail-field"><label>종료일</label><input type="date" value="${t.end_date || ""}" data-field="end_date" data-id="${t.id}" ${dis}></div>
+        <div class="task-detail-field"><label>비고</label><input value="${escapeHtml(t.note)}" data-field="note" data-id="${t.id}" ${dis} placeholder="-"></div>
+      </div>
+    </td>
+  </tr>`;
+}
+function toggleTaskDetail(id) {
+  if (openDetailRows.has(id)) openDetailRows.delete(id);
+  else openDetailRows.add(id);
+  const tbody = $("#taskTbody");
+  if (!tbody) return;
+  const btn = tbody.querySelector(`tr[data-id="${id}"]:not(.task-detail-row) [data-action="detail"]`);
+  const detailTr = tbody.querySelector(`tr.task-detail-row[data-id="${id}"]`);
+  const isOpen = openDetailRows.has(id);
+  if (btn) btn.classList.toggle("open", isOpen);
+  if (detailTr) detailTr.hidden = !isOpen;
 }
 function wireTaskRowEl(tr) {
   tr.querySelectorAll("input,select").forEach(el => {
@@ -669,6 +693,7 @@ function wireTaskRowEl(tr) {
     });
   });
   tr.querySelectorAll('[data-action="del"]').forEach(el => el.addEventListener("click", () => deleteTask(el.dataset.id)));
+  tr.querySelectorAll('[data-action="detail"]').forEach(el => el.addEventListener("click", () => toggleTaskDetail(el.dataset.id)));
   tr.querySelectorAll('[data-action="color"]').forEach(el => el.addEventListener("click", (e) => {
     if (e.target.tagName === "INPUT") return;
     if (state.editMode) openColorPicker(el, el.dataset.id);
@@ -678,15 +703,20 @@ function patchTaskRow(taskId) {
   const t = state.tasks.find(x => x.id === taskId);
   const tbody = $("#taskTbody");
   if (!tbody) return;
-  const oldTr = tbody.querySelector(`tr[data-id="${taskId}"]`);
+  const oldTr = tbody.querySelector(`tr[data-id="${taskId}"]:not(.task-detail-row)`);
+  const oldDetailTr = tbody.querySelector(`tr.task-detail-row[data-id="${taskId}"]`);
   if (!t || !oldTr) return;
-  if (oldTr.contains(document.activeElement)) return;
+  if (oldTr.contains(document.activeElement) || (oldDetailTr && oldDetailTr.contains(document.activeElement))) return;
   const dis = !state.editMode ? "disabled" : "";
   const wrapper = document.createElement("tbody");
   wrapper.innerHTML = buildTaskRowHtml(t, dis);
-  const newTr = wrapper.firstElementChild;
+  const newTr = wrapper.children[0];
+  const newDetailTr = wrapper.children[1];
   wireTaskRowEl(newTr);
+  wireTaskRowEl(newDetailTr);
   oldTr.replaceWith(newTr);
+  if (oldDetailTr) oldDetailTr.replaceWith(newDetailTr);
+  else newTr.after(newDetailTr);
 }
 function renderTable() {
   const tbody = $("#taskTbody");
@@ -699,7 +729,7 @@ function renderTable() {
     return headerHtml + g.tasks.map(t => buildTaskRowHtml(t, dis)).join("");
   }).join("") + (state.editMode ? `
     <tr class="add-task-row">
-      <td colspan="11"><button type="button" class="add-task-row-btn" id="addTaskBtnDesktop">+ 업무 추가</button></td>
+      <td colspan="8"><button type="button" class="add-task-row-btn" id="addTaskBtnDesktop">+ 업무 추가</button></td>
     </tr>
   ` : "");
 
@@ -712,18 +742,26 @@ function renderTable() {
 
 function wireDragReorder(tbody) {
   let dragEl = null;
-  tbody.querySelectorAll("tr[data-id]").forEach(row => {
-    row.addEventListener("dragstart", () => { dragEl = row; row.classList.add("dragging"); });
-    row.addEventListener("dragend", () => { row.classList.remove("dragging"); dragEl = null; });
+  let dragDetailEl = null;
+  // main rows only: each task's own task-detail-row travels along with it as a pair, never dropped on independently.
+  tbody.querySelectorAll("tr[data-id]:not(.task-detail-row)").forEach(row => {
+    row.addEventListener("dragstart", () => {
+      dragEl = row;
+      dragDetailEl = tbody.querySelector(`tr.task-detail-row[data-id="${row.dataset.id}"]`);
+      row.classList.add("dragging");
+    });
+    row.addEventListener("dragend", () => { row.classList.remove("dragging"); dragEl = null; dragDetailEl = null; });
     row.addEventListener("dragover", (e) => {
       e.preventDefault();
       if (!dragEl || dragEl === row) return;
       const rect = row.getBoundingClientRect();
       const before = (e.clientY - rect.top) < rect.height / 2;
-      row.parentNode.insertBefore(dragEl, before ? row : row.nextSibling);
+      const targetDetail = tbody.querySelector(`tr.task-detail-row[data-id="${row.dataset.id}"]`);
+      row.parentNode.insertBefore(dragEl, before ? row : (targetDetail ? targetDetail.nextSibling : row.nextSibling));
+      if (dragDetailEl) row.parentNode.insertBefore(dragDetailEl, dragEl.nextSibling);
     });
     row.addEventListener("drop", () => {
-      const ids = Array.from(tbody.querySelectorAll("tr[data-id]")).map(r => r.dataset.id);
+      const ids = Array.from(tbody.querySelectorAll("tr[data-id]:not(.task-detail-row)")).map(r => r.dataset.id);
       state.tasks.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
       persistOrder();
     });
@@ -984,7 +1022,7 @@ function openColorPicker(anchorEl, taskId) {
 
 // ---------- task table column resize ----------
 const COL_WIDTH_KEY = "taskTableColWidths";
-const COL_MIN_WIDTH = { phase: 64, name: 90, owner: 60, start: 104, end: 104, dep: 60, note: 60 };
+const COL_MIN_WIDTH = { phase: 64, name: 90, owner: 90, dep: 60 };
 const DEFAULT_MIN_COL_WIDTH = 50;
 function loadColWidths() {
   try { return JSON.parse(localStorage.getItem(COL_WIDTH_KEY) || "{}"); } catch (e) { return {}; }
