@@ -180,11 +180,6 @@ h1.title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; font
 .phase-pill input { color: inherit; font-weight: inherit; padding: 0; background: transparent; border: none; width: auto; min-width: 40px; text-align: center; }
 .task-table .phase-pill { display: flex; justify-content: center; width: 100%; }
 .task-table .phase-pill input { width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.col-color { width: 38px; text-align: center; background: var(--surface-alt); border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
-.color-swatch-btn { width: 24px; height: 24px; border-radius: 999px; border: 2px solid var(--surface); box-shadow: 0 0 0 1.5px var(--border-strong); cursor: pointer; padding: 0; transition: transform .1s ease, box-shadow .1s ease; }
-.color-swatch-btn:hover { box-shadow: 0 0 0 2px var(--accent); transform: scale(1.1); }
-.color-swatch-btn:disabled { cursor: default; }
-.color-swatch-btn:disabled:hover { box-shadow: 0 0 0 1.5px var(--border-strong); transform: none; }
 .col-taskstatus { width: 76px; text-align: center; }
 .task-status-badge { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: var(--surface-alt); color: var(--ink-2); border: 1px solid var(--border); white-space: nowrap; }
 .task-status-badge.delayed { background: rgba(168,50,50,0.14); color: var(--delay); border-color: transparent; }
@@ -214,6 +209,13 @@ select.task-status-badge:disabled { cursor: default; opacity: .85; }
   background-position: 0 0, 0 15px;
   background-repeat: no-repeat, repeat;
 }
+.dep-chip-row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; min-height: 34px; padding: 4px 0; }
+.dep-chip { display: inline-flex; align-items: center; gap: 3px; font-size: 11.5px; font-weight: 700; color: var(--ink-2); background: var(--page); border: 1px solid var(--border); border-radius: 999px; padding: 3px 5px 3px 9px; white-space: nowrap; }
+.dep-chip-del { background: none; border: none; color: var(--ink-muted); cursor: pointer; font-size: 10px; padding: 2px 4px; line-height: 1; }
+.dep-chip-del:hover { color: var(--critical); }
+.dep-add-btn { font: inherit; font-size: 11px; font-weight: 700; color: var(--accent); background: none; border: 1px dashed var(--border-strong); border-radius: 999px; padding: 3px 9px; cursor: pointer; white-space: nowrap; }
+.dep-add-btn:hover { background: var(--page); }
+.dep-empty { font-size: 12.5px; color: var(--ink-muted); }
 
 /* ---- phase(구분) group header / collapse ---- */
 .phase-group-row td { padding: 0; border-bottom: none; }
@@ -225,6 +227,14 @@ select.task-status-badge:disabled { cursor: default; opacity: .85; }
 .phase-group-dot { width: 13px; height: 13px; border-radius: 50%; flex: none; }
 .phase-group-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .phase-group-count { flex: none; font-size: 12.5px; font-weight: 700; color: var(--ink-muted); background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; }
+
+.phase-group-toggle-wrap { display: flex; align-items: center; background: var(--surface-alt); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border-strong); }
+.phase-group-row:first-child .phase-group-toggle-wrap { border-top: none; }
+.phase-group-toggle-wrap .phase-group-toggle { flex: 1; min-width: 0; border: none; }
+.phase-group-dot-btn { margin-left: 16px; border: 2px solid var(--surface); box-shadow: 0 0 0 1.5px var(--border-strong); cursor: pointer; padding: 0; transition: transform .1s ease, box-shadow .1s ease; }
+.phase-group-dot-btn:hover { box-shadow: 0 0 0 2px var(--accent); transform: scale(1.15); }
+.phase-group-dot-btn:disabled { cursor: default; }
+.phase-group-dot-btn:disabled:hover { box-shadow: 0 0 0 1.5px var(--border-strong); transform: none; }
 
 .gantt-row.gantt-phase-row { height: auto; min-height: 32px; border-bottom: 2px solid var(--border-strong); }
 .gantt-phase-label { display: block; padding: 0; }
@@ -281,6 +291,14 @@ select.task-status-badge:disabled { cursor: default; opacity: .85; }
 .color-picker { position: fixed; z-index: 200; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 12px; box-shadow: var(--shadow); padding: 10px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
 .color-swatch { width: 26px; height: 26px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; }
 .color-swatch.selected { border-color: var(--ink); }
+
+.dep-picker-popover { position: fixed; z-index: 200; width: 240px; max-height: 320px; overflow-y: auto; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 12px; box-shadow: var(--shadow); padding: 8px; }
+.dep-picker-group + .dep-picker-group { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+.dep-picker-phase-label { font-size: 11px; font-weight: 700; color: var(--ink-muted); padding: 2px 6px 4px; }
+.dep-picker-item { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--ink); padding: 5px 6px; border-radius: 6px; cursor: pointer; }
+.dep-picker-item:hover { background: var(--surface-alt); }
+.dep-picker-item input { cursor: pointer; }
+.dep-picker-empty { font-size: 12.5px; color: var(--ink-muted); text-align: center; padding: 10px 6px; }
 
 /* ---- gantt overlay (mobile fullscreen) ---- */
 .gantt-overlay { position: fixed; inset: 0; z-index: 300; background: var(--page); display: flex; flex-direction: column; }

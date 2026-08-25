@@ -380,7 +380,7 @@ async function updateTaskField(id, field, value) {
   const t = state.tasks.find(x => x.id === id);
   if (!t) return;
   t[field] = value;
-  debounceSave("task-" + id, async () => {
+  debounceSave("task-" + id + "-" + field, async () => {
     await supabase.from("tasks").update({ [field]: value, updated_at: new Date().toISOString() }).eq("id", id);
   });
 }
@@ -582,6 +582,13 @@ function wirePhaseToggles(container, view) {
     btn.addEventListener("click", () => togglePhase(holder.dataset.phase, view));
   });
 }
+function wirePhaseColorDots(container) {
+  container.querySelectorAll(".phase-group-dot-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (state.editMode) openPhaseColorPicker(btn, btn.dataset.phase);
+    });
+  });
+}
 function buildPhaseHeaderInnerHtml(g, collapsed, showDot = true) {
   const total = g.tasks.length;
   const done = g.tasks.filter(t => deriveTaskStatus(t).key === "done").length;
@@ -594,8 +601,14 @@ function buildPhaseHeaderInnerHtml(g, collapsed, showDot = true) {
   `;
 }
 function buildPhaseGroupHeaderRowHtml(g, collapsed) {
+  const dotBtn = `<button type="button" class="phase-group-dot phase-group-dot-btn" style="background:${g.color || PALETTE[0]}" data-action="phase-color" data-phase="${escapeHtml(g.key)}" title="클릭하면 이 구분 전체 업무의 색을 바꿀 수 있어요" ${!state.editMode ? "disabled" : ""}></button>`;
   return `<tr class="phase-group-row" data-phase="${escapeHtml(g.key)}">
-    <td colspan="7"><button type="button" class="phase-group-toggle">${buildPhaseHeaderInnerHtml(g, collapsed)}</button></td>
+    <td colspan="6">
+      <div class="phase-group-toggle-wrap">
+        ${dotBtn}
+        <button type="button" class="phase-group-toggle">${buildPhaseHeaderInnerHtml(g, collapsed, false)}</button>
+      </div>
+    </td>
   </tr>`;
 }
 
@@ -639,7 +652,7 @@ function wireOwnerToggles(container) {
 }
 function buildOwnerGroupHeaderRowHtml(g, collapsed) {
   return `<tr class="phase-group-row" data-owner="${escapeHtml(g.key)}">
-    <td colspan="7"><button type="button" class="phase-group-toggle">${buildPhaseHeaderInnerHtml(g, collapsed, false)}</button></td>
+    <td colspan="6"><button type="button" class="phase-group-toggle">${buildPhaseHeaderInnerHtml(g, collapsed, false)}</button></td>
   </tr>`;
 }
 
@@ -649,7 +662,6 @@ function buildTaskRowHtml(t, dis) {
   return `
     <tr draggable="${state.editMode}" data-id="${t.id}">
       <td class="col-drag"><span class="drag-handle">⠿</span></td>
-      <td class="col-color"><button type="button" class="color-swatch-btn" style="background:${t.phase_color}" data-action="color" data-id="${t.id}" title="클릭하면 색상을 바꿀 수 있어요" ${dis}></button></td>
       <td class="col-phase"><span class="phase-pill" style="background:${t.phase_color}">
         <input value="${escapeHtml(t.phase_name)}" data-field="phase_name" data-id="${t.id}" ${dis}>
       </span></td>
@@ -663,16 +675,96 @@ function buildTaskRowHtml(t, dis) {
 }
 function buildTaskDetailRowHtml(t, dis, open) {
   return `<tr class="task-detail-row" data-id="${t.id}" ${open ? "" : "hidden"}>
-    <td colspan="7">
+    <td colspan="6">
       <div class="task-detail-inner">
         <div class="task-detail-field"><label>담당자</label>${buildOwnerSelectHtml(t.owner, t.id, dis)}</div>
         <div class="task-detail-field"><label>시작일</label><input type="date" value="${t.start_date || ""}" data-field="start_date" data-id="${t.id}" ${dis}></div>
         <div class="task-detail-field"><label>종료일</label><input type="date" value="${t.end_date || ""}" data-field="end_date" data-id="${t.id}" ${dis}></div>
-        <div class="task-detail-field"><label>선행업무</label><textarea class="autosize-textarea" rows="1" data-field="dependency" data-id="${t.id}" ${dis} placeholder="-">${escapeHtml(t.dependency)}</textarea></div>
+        <div class="task-detail-field"><label>선행업무</label>${buildDependencyFieldHtml(t)}</div>
         <div class="task-detail-field"><label>비고</label><textarea class="autosize-textarea" rows="1" data-field="note" data-id="${t.id}" ${dis} placeholder="-">${escapeHtml(t.note)}</textarea></div>
       </div>
     </td>
   </tr>`;
+}
+function parseDependencyIds(raw) {
+  if (!raw) return [];
+  try {
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.filter(id => typeof id === "string") : [];
+  } catch (e) { return []; }
+}
+function buildDependencyFieldHtml(t) {
+  const editable = state.editMode;
+  const ids = parseDependencyIds(t.dependency);
+  const chips = ids.map(id => {
+    const dt = state.tasks.find(x => x.id === id);
+    if (!dt) return "";
+    return `<span class="dep-chip">${escapeHtml(dt.name || "(제목 없음)")}${editable ? `<button type="button" class="dep-chip-del" data-id="${t.id}" data-dep-id="${id}" aria-label="삭제">✕</button>` : ""}</span>`;
+  }).join("");
+  const addBtn = editable ? `<button type="button" class="dep-add-btn" data-action="dep-pick" data-id="${t.id}">+ 선택</button>` : "";
+  const emptyHtml = (!chips && !editable) ? `<span class="dep-empty">-</span>` : "";
+  return `<div class="dep-chip-row" data-id="${t.id}">${chips}${emptyHtml}${addBtn}</div>`;
+}
+function wireDependencyField(container) {
+  container.querySelectorAll('[data-action="dep-pick"]').forEach(el => el.addEventListener("click", () => {
+    if (state.editMode) openDependencyPicker(el, el.dataset.id);
+  }));
+  container.querySelectorAll(".dep-chip-del").forEach(el => el.addEventListener("click", () => {
+    const t = state.tasks.find(x => x.id === el.dataset.id);
+    if (!t) return;
+    const ids = parseDependencyIds(t.dependency).filter(id => id !== el.dataset.depId);
+    updateTaskField(t.id, "dependency", ids.length ? JSON.stringify(ids) : "");
+    refreshDependencyField(t.id);
+  }));
+}
+function refreshDependencyField(taskId) {
+  const row = document.querySelector(`.dep-chip-row[data-id="${taskId}"]`);
+  const t = state.tasks.find(x => x.id === taskId);
+  if (!row || !t) return;
+  row.outerHTML = buildDependencyFieldHtml(t);
+  const newRow = document.querySelector(`.dep-chip-row[data-id="${taskId}"]`);
+  if (newRow) wireDependencyField(newRow.parentElement);
+}
+function openDependencyPicker(anchorEl, taskId) {
+  const picker = $("#depPicker");
+  const others = state.tasks.filter(x => x.id !== taskId);
+  const t = state.tasks.find(x => x.id === taskId);
+  const selected = new Set(parseDependencyIds(t?.dependency));
+  if (!others.length) {
+    picker.innerHTML = `<div class="dep-picker-empty">선택할 수 있는 다른 업무가 없습니다</div>`;
+  } else {
+    const groups = groupTasksByPhase(others);
+    picker.innerHTML = groups.map(g => `
+      <div class="dep-picker-group">
+        <div class="dep-picker-phase-label">${escapeHtml(g.key || "구분")}</div>
+        ${g.tasks.map(dt => `
+          <label class="dep-picker-item">
+            <input type="checkbox" data-dep-id="${dt.id}" ${selected.has(dt.id) ? "checked" : ""}>
+            <span>${escapeHtml(dt.name || "(제목 없음)")}</span>
+          </label>
+        `).join("")}
+      </div>
+    `).join("");
+  }
+  const rect = anchorEl.getBoundingClientRect();
+  picker.hidden = false;
+  const pickerHeight = Math.min(picker.scrollHeight || 200, 320);
+  let top = rect.bottom + 6;
+  if (top + pickerHeight > window.innerHeight) top = Math.max(8, rect.top - pickerHeight - 6);
+  picker.style.top = top + "px";
+  picker.style.left = Math.min(rect.left, window.innerWidth - 260) + "px";
+  picker.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener("change", () => {
+      const ids = new Set(parseDependencyIds(state.tasks.find(x => x.id === taskId)?.dependency));
+      if (cb.checked) ids.add(cb.dataset.depId); else ids.delete(cb.dataset.depId);
+      updateTaskField(taskId, "dependency", ids.size ? JSON.stringify([...ids]) : "");
+      refreshDependencyField(taskId);
+    });
+  });
+  const closeOnOutside = (e) => {
+    if (!picker.contains(e.target) && e.target !== anchorEl) { picker.hidden = true; document.removeEventListener("click", closeOnOutside, true); }
+  };
+  setTimeout(() => document.addEventListener("click", closeOnOutside, true), 0);
 }
 function autosizeTextarea(el) {
   el.style.height = "auto";
@@ -703,10 +795,7 @@ function wireTaskRowEl(tr) {
   if (!tr.hidden) tr.querySelectorAll("textarea.autosize-textarea").forEach(autosizeTextarea);
   tr.querySelectorAll('[data-action="del"]').forEach(el => el.addEventListener("click", () => deleteTask(el.dataset.id)));
   tr.querySelectorAll('[data-action="detail"]').forEach(el => el.addEventListener("click", () => toggleTaskDetail(el.dataset.id)));
-  tr.querySelectorAll('[data-action="color"]').forEach(el => el.addEventListener("click", (e) => {
-    if (e.target.tagName === "INPUT") return;
-    if (state.editMode) openColorPicker(el, el.dataset.id);
-  }));
+  wireDependencyField(tr);
 }
 function patchTaskRow(taskId) {
   const t = state.tasks.find(x => x.id === taskId);
@@ -721,11 +810,11 @@ function patchTaskRow(taskId) {
   wrapper.innerHTML = buildTaskRowHtml(t, dis);
   const newTr = wrapper.children[0];
   const newDetailTr = wrapper.children[1];
-  wireTaskRowEl(newTr);
-  wireTaskRowEl(newDetailTr);
   oldTr.replaceWith(newTr);
   if (oldDetailTr) oldDetailTr.replaceWith(newDetailTr);
   else newTr.after(newDetailTr);
+  wireTaskRowEl(newTr);
+  wireTaskRowEl(newDetailTr);
 }
 function renderTable() {
   const tbody = $("#taskTbody");
@@ -738,12 +827,12 @@ function renderTable() {
     return headerHtml + g.tasks.map(t => buildTaskRowHtml(t, dis)).join("");
   }).join("") + (state.editMode ? `
     <tr class="add-task-row">
-      <td colspan="7"><button type="button" class="add-task-row-btn" id="addTaskBtnDesktop">+ 업무 추가</button></td>
+      <td colspan="6"><button type="button" class="add-task-row-btn" id="addTaskBtnDesktop">+ 업무 추가</button></td>
     </tr>
   ` : "");
 
   tbody.querySelectorAll("tr[data-id]").forEach(wireTaskRowEl);
-  if (byOwner) wireOwnerToggles(tbody); else wirePhaseToggles(tbody, "table");
+  if (byOwner) { wireOwnerToggles(tbody); } else { wirePhaseToggles(tbody, "table"); wirePhaseColorDots(tbody); }
   const addBtn = tbody.querySelector("#addTaskBtnDesktop");
   if (addBtn) addBtn.addEventListener("click", addTask);
   wireDragReorder(tbody);
@@ -1016,7 +1105,7 @@ function renderCards() {
 }
 
 // ---------- color picker ----------
-function openColorPicker(anchorEl, taskId) {
+function openColorPickerCore(anchorEl, currentColor, onSelect) {
   const picker = $("#colorPicker");
   const rect = anchorEl.getBoundingClientRect();
   const pickerHeight = 90;
@@ -1024,20 +1113,32 @@ function openColorPicker(anchorEl, taskId) {
   if (top + pickerHeight > window.innerHeight) top = Math.max(8, rect.top - pickerHeight - 6);
   picker.style.top = top + "px";
   picker.style.left = Math.min(rect.left, window.innerWidth - 220) + "px";
-  const current = state.tasks.find(t => t.id === taskId)?.phase_color;
-  picker.innerHTML = PALETTE.map(c => `<span class="color-swatch ${c === current ? "selected" : ""}" style="background:${c}" data-color="${c}"></span>`).join("");
+  picker.innerHTML = PALETTE.map(c => `<span class="color-swatch ${c === currentColor ? "selected" : ""}" style="background:${c}" data-color="${c}"></span>`).join("");
   picker.hidden = false;
   picker.querySelectorAll(".color-swatch").forEach(sw => {
     sw.addEventListener("click", () => {
-      updateTaskField(taskId, "phase_color", sw.dataset.color);
       picker.hidden = true;
-      renderAll();
+      onSelect(sw.dataset.color);
     });
   });
   const closeOnOutside = (e) => {
     if (!picker.contains(e.target)) { picker.hidden = true; document.removeEventListener("click", closeOnOutside, true); }
   };
   setTimeout(() => document.addEventListener("click", closeOnOutside, true), 0);
+}
+function openColorPicker(anchorEl, taskId) {
+  const current = state.tasks.find(t => t.id === taskId)?.phase_color;
+  openColorPickerCore(anchorEl, current, (color) => {
+    updateTaskField(taskId, "phase_color", color);
+    renderAll();
+  });
+}
+function openPhaseColorPicker(anchorEl, phaseKey) {
+  const groupTasks = state.tasks.filter(t => phaseKeyOf(t.phase_name) === phaseKey);
+  openColorPickerCore(anchorEl, groupTasks[0]?.phase_color, (color) => {
+    groupTasks.forEach(t => updateTaskField(t.id, "phase_color", color));
+    renderAll();
+  });
 }
 
 // ---------- task table column resize ----------
