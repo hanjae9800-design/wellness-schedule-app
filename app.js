@@ -98,7 +98,7 @@ function renderFilterOptions() {
 
   const phaseHtml = `<option value="">구분</option>` + phases.map(name => `<option value="${escapeHtml(name)}" ${taskFilters.phase === name ? "selected" : ""}>${escapeHtml(name)}</option>`).join("");
   const ownerHtml = `<option value="">담당자</option>` + owners.map(name => `<option value="${escapeHtml(name)}" ${taskFilters.owner === name ? "selected" : ""}>${escapeHtml(name)}</option>`).join("");
-  ["#filterPhase", "#filterPhaseMobile"].forEach(sel => { $(sel).innerHTML = phaseHtml; });
+  ["#filterPhase", "#filterPhaseMobile"].forEach(sel => { const el = $(sel); if (el) el.innerHTML = phaseHtml; });
   ["#filterOwner", "#filterOwnerMobile"].forEach(sel => { $(sel).innerHTML = ownerHtml; });
   ["#filterStatus", "#filterStatusMobile"].forEach(sel => { $(sel).value = taskFilters.status; });
 }
@@ -642,7 +642,7 @@ function buildPhaseHeaderInnerHtml(g, collapsed, showDot = true, nameEditable = 
 function buildPhaseGroupHeaderRowHtml(g, collapsed) {
   const dotBtn = `<button type="button" class="phase-group-dot phase-group-dot-btn" style="background:${g.color || PALETTE[0]}" data-action="phase-color" data-phase="${escapeHtml(g.key)}" title="클릭하면 이 구분 전체 업무의 색을 바꿀 수 있어요" ${!state.editMode ? "disabled" : ""}></button>`;
   return `<tr class="phase-group-row" data-phase="${escapeHtml(g.key)}">
-    <td colspan="6">
+    <td colspan="5">
       <div class="phase-group-toggle-wrap">
         ${dotBtn}
         <div class="phase-group-toggle" role="button" tabindex="0">${buildPhaseHeaderInnerHtml(g, collapsed, false, true)}</div>
@@ -691,7 +691,7 @@ function wireOwnerToggles(container) {
 }
 function buildOwnerGroupHeaderRowHtml(g, collapsed) {
   return `<tr class="phase-group-row" data-owner="${escapeHtml(g.key)}">
-    <td colspan="6"><button type="button" class="phase-group-toggle">${buildPhaseHeaderInnerHtml(g, collapsed, false)}</button></td>
+    <td colspan="5"><button type="button" class="phase-group-toggle">${buildPhaseHeaderInnerHtml(g, collapsed, false)}</button></td>
   </tr>`;
 }
 
@@ -701,8 +701,7 @@ function buildTaskRowHtml(t, dis) {
   return `
     <tr draggable="${state.editMode}" data-id="${t.id}">
       <td class="col-drag"><span class="drag-handle">⠿</span></td>
-      <td class="col-phase"></td>
-      <td><input value="${escapeHtml(t.name)}" data-field="name" data-id="${t.id}" ${dis} placeholder="업무명"></td>
+      <td class="col-name"><input value="${escapeHtml(t.name)}" data-field="name" data-id="${t.id}" ${dis} placeholder="업무명"></td>
       <td class="col-taskstatus">${buildTaskStatusSelectHtml(t, ts, dis)}</td>
       <td class="col-detail"><button type="button" class="detail-btn ${open ? "open" : ""}" data-action="detail" data-id="${t.id}"><span class="detail-car">▾</span> 세부내용</button></td>
       <td class="col-del">${state.editMode ? `<button class="del-btn" data-action="del" data-id="${t.id}">✕</button>` : ""}</td>
@@ -712,7 +711,7 @@ function buildTaskRowHtml(t, dis) {
 }
 function buildTaskDetailRowHtml(t, dis, open) {
   return `<tr class="task-detail-row" data-id="${t.id}" ${open ? "" : "hidden"}>
-    <td colspan="6">
+    <td colspan="5">
       <div class="task-detail-inner">
         <div class="task-detail-field"><label>담당자</label>${buildOwnerSelectHtml(t.owner, t.id, dis)}</div>
         <div class="task-detail-field"><label>시작일</label><input type="date" value="${t.start_date || ""}" data-field="start_date" data-id="${t.id}" ${dis}></div>
@@ -864,7 +863,7 @@ function renderTable() {
     return headerHtml + g.tasks.map(t => buildTaskRowHtml(t, dis)).join("");
   }).join("") + (state.editMode ? `
     <tr class="add-task-row">
-      <td colspan="6"><button type="button" class="add-task-row-btn" id="addTaskBtnDesktop">+ 업무 추가</button></td>
+      <td colspan="5"><button type="button" class="add-task-row-btn" id="addTaskBtnDesktop">+ 업무 추가</button></td>
     </tr>
   ` : "");
 
@@ -1180,7 +1179,7 @@ function openPhaseColorPicker(anchorEl, phaseKey) {
 
 // ---------- task table column resize ----------
 const COL_WIDTH_KEY = "taskTableColWidths";
-const COL_MIN_WIDTH = { phase: 40, name: 90, owner: 90 };
+const COL_MIN_WIDTH = { name: 90, owner: 90 };
 const DEFAULT_MIN_COL_WIDTH = 50;
 function loadColWidths() {
   try { return JSON.parse(localStorage.getItem(COL_WIDTH_KEY) || "{}"); } catch (e) { return {}; }
@@ -1276,9 +1275,11 @@ function wireViewNav() {
 function wireStaticUI() {
   const wireFilterPair = (key, ids) => {
     ids.forEach(id => {
-      $(id).addEventListener("change", () => {
-        taskFilters[key] = $(id).value;
-        ids.forEach(otherId => { if (otherId !== id) $(otherId).value = taskFilters[key]; });
+      const el = $(id);
+      if (!el) return;
+      el.addEventListener("change", () => {
+        taskFilters[key] = el.value;
+        ids.forEach(otherId => { const other = $(otherId); if (other && otherId !== id) other.value = taskFilters[key]; });
         applyTaskFilters();
       });
     });
