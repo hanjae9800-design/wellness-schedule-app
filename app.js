@@ -53,8 +53,6 @@ function applyAuthUI(hasOwnChecklist) {
   $("#googleLogoutBtn").hidden = !loggedIn;
   $("#checklistUserInfo").hidden = !loggedIn;
   if (loggedIn) $("#checklistUserInfo").textContent = currentUser.email || currentUser.user_metadata?.name || "로그인됨";
-  $("#checklistLoginPrompt").hidden = loggedIn;
-  $("#checklistList").hidden = !loggedIn;
   const newChecklistBtn = $("#newChecklistBtn");
   if (!loggedIn) {
     newChecklistBtn.disabled = true;
@@ -337,9 +335,7 @@ function renderProjectGroup(selector, projects, emptyText, groupByTeam) {
 }
 function renderLanding() {
   const timelineProjects = landingProjects.filter(p => p.type !== "checklist");
-  const checklistProjects = landingProjects.filter(p => p.type === "checklist");
   renderProjectGroup("#projectList", timelineProjects, "아직 만들어진 프로젝트가 없습니다. 아래에서 새로 만들어보세요.", true);
-  renderProjectGroup("#checklistList", checklistProjects, "아직 만들어진 업무 체크리스트가 없습니다. 아래에서 새로 만들어보세요.", false);
   updateBulkBar();
 }
 function updateBulkBar() {
