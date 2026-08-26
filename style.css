@@ -63,6 +63,9 @@ button { font-family: inherit; }
 .landing-sub { color: var(--ink-2); font-size: 14px; margin: 0 0 28px; line-height: 1.6; }
 .landing-section-title { font-family: "Noto Serif KR", serif; font-weight: 700; font-size: 15px; color: var(--ink-2); margin: 22px 0 10px; }
 .landing-section-title:first-of-type { margin-top: 0; }
+.landing-team-group { display: flex; flex-direction: column; gap: 10px; }
+.landing-team-label { font-size: 12px; font-weight: 700; color: var(--ink-muted); text-transform: uppercase; letter-spacing: .04em; }
+.landing-team-group:not(:first-child) { margin-top: 6px; }
 .project-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
 .project-card { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 10px 10px 14px; box-shadow: var(--shadow); }
 .project-card:hover { border-color: var(--accent); }

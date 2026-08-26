@@ -260,18 +260,37 @@ function wireProjectCardList(list) {
     btn.addEventListener("click", () => deleteProjects([btn.dataset.id]));
   });
 }
-function renderProjectGroup(selector, projects, emptyText) {
+function groupProjectsByDept(projects) {
+  const order = [];
+  const map = new Map();
+  projects.forEach(p => {
+    const key = (p.dept || "").trim() || "미분류";
+    if (!map.has(key)) { map.set(key, []); order.push(key); }
+    map.get(key).push(p);
+  });
+  return order.map(key => ({ key, projects: map.get(key) }));
+}
+function renderProjectGroup(selector, projects, emptyText, groupByTeam) {
   const list = $(selector);
-  list.innerHTML = projects.length
-    ? projects.map(buildProjectCardHtml).join("")
-    : `<div class="empty-note">${emptyText}</div>`;
+  if (!projects.length) {
+    list.innerHTML = `<div class="empty-note">${emptyText}</div>`;
+  } else if (groupByTeam) {
+    list.innerHTML = groupProjectsByDept(projects).map(g => `
+      <div class="landing-team-group">
+        <div class="landing-team-label">${escapeHtml(g.key)}</div>
+        ${g.projects.map(buildProjectCardHtml).join("")}
+      </div>
+    `).join("");
+  } else {
+    list.innerHTML = projects.map(buildProjectCardHtml).join("");
+  }
   wireProjectCardList(list);
 }
 function renderLanding() {
   const timelineProjects = landingProjects.filter(p => p.type !== "checklist");
   const checklistProjects = landingProjects.filter(p => p.type === "checklist");
-  renderProjectGroup("#projectList", timelineProjects, "아직 만들어진 프로젝트가 없습니다. 아래에서 새로 만들어보세요.");
-  renderProjectGroup("#checklistList", checklistProjects, "아직 만들어진 업무 체크리스트가 없습니다. 아래에서 새로 만들어보세요.");
+  renderProjectGroup("#projectList", timelineProjects, "아직 만들어진 프로젝트가 없습니다. 아래에서 새로 만들어보세요.", true);
+  renderProjectGroup("#checklistList", checklistProjects, "아직 만들어진 업무 체크리스트가 없습니다. 아래에서 새로 만들어보세요.", false);
   updateBulkBar();
 }
 function updateBulkBar() {
