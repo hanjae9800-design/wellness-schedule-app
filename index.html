@@ -28,7 +28,15 @@
     <h2 class="landing-section-title">프로젝트</h2>
     <div class="project-list" id="projectList"></div>
 
-    <h2 class="landing-section-title">업무 체크리스트</h2>
+    <div class="landing-section-head">
+      <h2 class="landing-section-title">업무 체크리스트</h2>
+      <div class="checklist-auth-area" id="checklistAuthArea">
+        <button type="button" class="secondary" id="googleLoginBtn" hidden>Google로 로그인</button>
+        <span class="checklist-user-info" id="checklistUserInfo" hidden></span>
+        <button type="button" class="link-btn" id="googleLogoutBtn" hidden>로그아웃</button>
+      </div>
+    </div>
+    <p class="empty-note" id="checklistLoginPrompt" hidden>내 업무 체크리스트는 본인 계정으로 로그인해야 보이고 만들 수 있습니다.</p>
     <div class="project-list" id="checklistList"></div>
 
     <div class="new-project-box">

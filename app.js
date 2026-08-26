@@ -21,9 +21,52 @@ let viewMode = "all";
 let openDetailRows = new Set();
 // pointer-based row reorder tracking (threshold-based: a plain click never moves a row, only a real press-and-move does)
 let dragTracking = null;
+// 업무 체크리스트는 구글 로그인한 본인만 접근 가능; 로그인 안 했으면 null.
+let currentUser = null;
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+
+// ---------- 구글 로그인 (업무 체크리스트 전용) ----------
+async function initAuth() {
+  const { data: { session } } = await supabase.auth.getSession();
+  currentUser = session?.user || null;
+  supabase.auth.onAuthStateChange((_event, newSession) => {
+    currentUser = newSession?.user || null;
+  });
+}
+function wireAuthUI() {
+  $("#googleLoginBtn").addEventListener("click", () => {
+    supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: location.origin + location.pathname + location.search }
+    });
+  });
+  $("#googleLogoutBtn").addEventListener("click", async () => {
+    await supabase.auth.signOut();
+    location.reload();
+  });
+}
+function applyAuthUI(hasOwnChecklist) {
+  const loggedIn = !!currentUser;
+  $("#googleLoginBtn").hidden = loggedIn;
+  $("#googleLogoutBtn").hidden = !loggedIn;
+  $("#checklistUserInfo").hidden = !loggedIn;
+  if (loggedIn) $("#checklistUserInfo").textContent = currentUser.email || currentUser.user_metadata?.name || "로그인됨";
+  $("#checklistLoginPrompt").hidden = loggedIn;
+  $("#checklistList").hidden = !loggedIn;
+  const newChecklistBtn = $("#newChecklistBtn");
+  if (!loggedIn) {
+    newChecklistBtn.disabled = true;
+    newChecklistBtn.title = "먼저 Google로 로그인해주세요";
+  } else if (hasOwnChecklist) {
+    newChecklistBtn.disabled = true;
+    newChecklistBtn.title = "체크리스트는 계정당 1개까지만 만들 수 있어요";
+  } else {
+    newChecklistBtn.disabled = false;
+    newChecklistBtn.title = "";
+  }
+}
 
 // ---------- light / dark theme toggle ----------
 function loadTheme() {
@@ -177,6 +220,7 @@ function getProjectIdFromUrl() {
 }
 
 async function initGate() {
+  await initAuth();
   const pid = getProjectIdFromUrl();
   try {
     if (pid) {
@@ -210,6 +254,8 @@ async function enterLanding() {
   await loadLandingProgress();
   renderLanding();
   wireLandingUI();
+  const hasOwnChecklist = !!currentUser && landingProjects.some(p => p.type === "checklist" && p.owner_user_id === currentUser.id);
+  applyAuthUI(hasOwnChecklist);
   $("#landing").hidden = false;
 }
 async function loadLandingProgress() {
@@ -316,13 +362,15 @@ function wireLandingUI() {
   $("#bulkDeleteBtn").addEventListener("click", () => deleteProjects([...selectedProjectIds]));
   $("#bulkClearBtn").addEventListener("click", () => { selectedProjectIds.clear(); renderLanding(); });
   const createProject = async (type) => {
+    if (type === "checklist" && !currentUser) { $("#googleLoginBtn").click(); return; }
     const org = $("#newOrgInput").value.trim();
     const dept = $("#newDeptInput").value.trim();
     const pm = type === "checklist" ? "" : $("#newPmInput").value.trim();
     const name = $("#newNameInput").value.trim();
     if (!name) { $("#newNameInput").focus(); return; }
-    const { data, error } = await supabase.from("projects").insert({ org, dept, pm, name, mode: "view", status: "todo", type }).select().single();
-    if (error) { console.error(error); return; }
+    const ownerFields = type === "checklist" ? { owner_user_id: currentUser.id } : {};
+    const { data, error } = await supabase.from("projects").insert({ org, dept, pm, name, mode: "view", status: "todo", type, ...ownerFields }).select().single();
+    if (error) { console.error(error); alert("만들기에 실패했습니다: " + error.message); return; }
     location.href = "?p=" + data.id;
   };
   $("#newProjectBtn").addEventListener("click", () => createProject("timeline"));
@@ -1599,4 +1647,5 @@ async function applyImportedTasks(tasks, mode) {
 }
 
 wireFeedbackUI();
+wireAuthUI();
 initGate();
