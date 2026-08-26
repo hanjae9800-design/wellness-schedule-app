@@ -358,7 +358,6 @@ function applyRemoteTaskChange(payload) {
   applyTaskFilters();
   renderStats();
   renderOwnerSummary();
-  renderPhaseSummary();
   renderLegend();
   renderGantt();
 }
@@ -422,7 +421,6 @@ function renderAll() {
   renderHeader();
   renderStats();
   renderOwnerSummary();
-  renderPhaseSummary();
   renderLegend();
   renderTable();
   renderGantt();
@@ -431,7 +429,6 @@ function renderAll() {
 function refreshTaskDerivedViews() {
   renderStats();
   renderOwnerSummary();
-  renderPhaseSummary();
   renderTable();
   renderGantt();
   renderCards();
@@ -495,10 +492,12 @@ function renderStats() {
   const total = state.tasks.length;
   const done = state.tasks.filter(t => t.status === "done").length;
   const doing = state.tasks.filter(t => t.status === "doing").length;
+  const delayed = state.tasks.filter(t => deriveTaskStatus(t).key === "delayed").length;
   $("#stats").innerHTML = `
     <div class="stat-chip">전체 <b>${total}</b></div>
     <div class="stat-chip">완료 <b>${done}</b></div>
     <div class="stat-chip">진행중 <b>${doing}</b></div>
+    <div class="stat-chip delayed">지연 <b>${delayed}</b></div>
     <div class="stat-chip">진행률 <b>${total ? Math.round(done / total * 100) : 0}%</b></div>
   `;
 }
@@ -526,30 +525,6 @@ function renderOwnerSummary() {
         <span class="owner-count doing">진행중 ${g.doing}</span>
         <span class="owner-count delayed">지연 ${g.delayed}</span>
         <span class="owner-count done">완료 ${g.done}</span>
-      </div>
-      <div class="owner-summary-bar"><div class="owner-summary-bar-fill" style="width:${donePct}%"></div></div>
-      <div class="owner-summary-pct">${donePct}%</div>
-    </div>`;
-  }).join("");
-}
-function renderPhaseSummary() {
-  const el = $("#phaseSummary");
-  if (el.hidden) return;
-  const groups = groupTasksByPhase(state.tasks);
-  if (!groups.length) { el.innerHTML = `<div class="owner-summary-empty">업무가 없습니다</div>`; return; }
-  el.innerHTML = groups.map(g => {
-    const c = { todo: 0, doing: 0, delayed: 0, done: 0 };
-    g.tasks.forEach(t => c[deriveTaskStatus(t).key]++);
-    const total = g.tasks.length;
-    const donePct = total ? Math.round(c.done / total * 100) : 0;
-    return `
-    <div class="owner-summary-row">
-      <div class="owner-summary-name">${escapeHtml(g.key || "구분")}</div>
-      <div class="owner-summary-counts">
-        <span class="owner-count todo" data-phase="${escapeHtml(g.key)}" data-status="todo">예정 ${c.todo}</span>
-        <span class="owner-count doing" data-phase="${escapeHtml(g.key)}" data-status="doing">진행중 ${c.doing}</span>
-        <span class="owner-count delayed" data-phase="${escapeHtml(g.key)}" data-status="delayed">지연 ${c.delayed}</span>
-        <span class="owner-count done" data-phase="${escapeHtml(g.key)}" data-status="done">완료 ${c.done}</span>
       </div>
       <div class="owner-summary-bar"><div class="owner-summary-bar-fill" style="width:${donePct}%"></div></div>
       <div class="owner-summary-pct">${donePct}%</div>
@@ -618,6 +593,14 @@ function wirePhaseColorDots(container) {
     });
   });
 }
+function wirePhaseStatChips(container) {
+  container.querySelectorAll(".phase-group-stat-chip").forEach(chip => {
+    chip.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openPhaseStatusPopover(chip, chip.dataset.phase, chip.dataset.status);
+    });
+  });
+}
 function wirePhaseNameEdit(container) {
   container.querySelectorAll(".phase-group-name-editable").forEach(span => {
     span.addEventListener("click", (e) => {
@@ -668,6 +651,16 @@ function buildPhaseHeaderInnerHtml(g, collapsed, showDot = true, nameEditable = 
     <span class="phase-group-count">${done}/${total}</span>
   `;
 }
+function buildPhaseGroupStatChipsHtml(g) {
+  const c = { todo: 0, doing: 0, delayed: 0, done: 0 };
+  g.tasks.forEach(t => c[deriveTaskStatus(t).key]++);
+  return `<span class="phase-group-stats">
+    <span class="phase-group-stat-chip owner-count todo" data-phase="${escapeHtml(g.key)}" data-status="todo">예정 ${c.todo}</span>
+    <span class="phase-group-stat-chip owner-count doing" data-phase="${escapeHtml(g.key)}" data-status="doing">진행중 ${c.doing}</span>
+    <span class="phase-group-stat-chip owner-count delayed" data-phase="${escapeHtml(g.key)}" data-status="delayed">지연 ${c.delayed}</span>
+    <span class="phase-group-stat-chip owner-count done" data-phase="${escapeHtml(g.key)}" data-status="done">완료 ${c.done}</span>
+  </span>`;
+}
 function buildPhaseGroupHeaderRowHtml(g, collapsed) {
   const dotBtn = `<button type="button" class="phase-group-dot phase-group-dot-btn" style="background:${g.color || PALETTE[0]}" data-action="phase-color" data-phase="${escapeHtml(g.key)}" title="클릭하면 이 구분 전체 업무의 색을 바꿀 수 있어요" ${!state.editMode ? "disabled" : ""}></button>`;
   return `<tr class="phase-group-row" data-phase="${escapeHtml(g.key)}">
@@ -675,6 +668,7 @@ function buildPhaseGroupHeaderRowHtml(g, collapsed) {
       <div class="phase-group-toggle-wrap">
         ${dotBtn}
         <div class="phase-group-toggle" role="button" tabindex="0">${buildPhaseHeaderInnerHtml(g, collapsed, false, true)}</div>
+        ${buildPhaseGroupStatChipsHtml(g)}
       </div>
     </td>
   </tr>`;
@@ -934,7 +928,7 @@ function renderTable() {
   ` : "");
 
   tbody.querySelectorAll("tr[data-id]").forEach(wireTaskRowEl);
-  if (byOwner) { wireOwnerToggles(tbody); } else { wirePhaseToggles(tbody, "table"); wirePhaseColorDots(tbody); wirePhaseNameEdit(tbody); }
+  if (byOwner) { wireOwnerToggles(tbody); } else { wirePhaseToggles(tbody, "table"); wirePhaseColorDots(tbody); wirePhaseNameEdit(tbody); wirePhaseStatChips(tbody); }
   const addBtn = tbody.querySelector("#addTaskBtnDesktop");
   if (addBtn) addBtn.addEventListener("click", addTask);
   wireDragReorder(tbody);
@@ -1390,14 +1384,6 @@ function wireStaticUI() {
   $("#ownerSummaryToggleBtn").addEventListener("click", () => {
     $("#ownerSummary").hidden = !$("#ownerSummary").hidden;
     renderOwnerSummary();
-  });
-  $("#phaseSummaryToggleBtn").addEventListener("click", () => {
-    $("#phaseSummary").hidden = !$("#phaseSummary").hidden;
-    renderPhaseSummary();
-  });
-  $("#phaseSummary").addEventListener("click", (e) => {
-    const chip = e.target.closest(".owner-count[data-phase]");
-    if (chip) openPhaseStatusPopover(chip, chip.dataset.phase, chip.dataset.status);
   });
   wireColumnResize();
 }
