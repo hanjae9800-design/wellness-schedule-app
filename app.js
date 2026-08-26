@@ -19,6 +19,8 @@ let collapsedOwnersTable = new Set();
 let viewMode = "all";
 // task ids whose "세부내용" (담당자/시작일/종료일/비고) row is expanded in the 업무 목록 table; session-only, not persisted.
 let openDetailRows = new Set();
+// pointer-based row reorder tracking (threshold-based: a plain click never moves a row, only a real press-and-move does)
+let dragTracking = null;
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
@@ -699,7 +701,7 @@ function buildTaskRowHtml(t, dis) {
   const ts = deriveTaskStatus(t);
   const open = openDetailRows.has(t.id);
   return `
-    <tr draggable="${state.editMode}" data-id="${t.id}">
+    <tr data-id="${t.id}">
       <td class="col-drag"><span class="drag-handle">⠿</span></td>
       <td class="col-name"><input value="${escapeHtml(t.name)}" data-field="name" data-id="${t.id}" ${dis} placeholder="업무명"></td>
       <td class="col-taskstatus">${buildTaskStatusSelectHtml(t, ts, dis)}</td>
@@ -874,30 +876,19 @@ function renderTable() {
   wireDragReorder(tbody);
 }
 
+// Threshold-based reorder: a plain click (no meaningful movement) never moves a row, only
+// pressing and actually dragging past DRAG_THRESHOLD px does. Row-level pointerdown just
+// records a candidate; the real drag/drop logic lives in the document-level pointermove/
+// pointerup listeners wired once in wireStaticUI(). Main rows only: each task's own
+// task-detail-row travels along with it as a pair, never dropped on independently.
+const DRAG_THRESHOLD = 6;
 function wireDragReorder(tbody) {
-  let dragEl = null;
-  let dragDetailEl = null;
-  // main rows only: each task's own task-detail-row travels along with it as a pair, never dropped on independently.
   tbody.querySelectorAll("tr[data-id]:not(.task-detail-row)").forEach(row => {
-    row.addEventListener("dragstart", () => {
-      dragEl = row;
-      dragDetailEl = tbody.querySelector(`tr.task-detail-row[data-id="${row.dataset.id}"]`);
-      row.classList.add("dragging");
-    });
-    row.addEventListener("dragend", () => { row.classList.remove("dragging"); dragEl = null; dragDetailEl = null; });
-    row.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      if (!dragEl || dragEl === row) return;
-      const rect = row.getBoundingClientRect();
-      const before = (e.clientY - rect.top) < rect.height / 2;
-      const targetDetail = tbody.querySelector(`tr.task-detail-row[data-id="${row.dataset.id}"]`);
-      row.parentNode.insertBefore(dragEl, before ? row : (targetDetail ? targetDetail.nextSibling : row.nextSibling));
-      if (dragDetailEl) row.parentNode.insertBefore(dragDetailEl, dragEl.nextSibling);
-    });
-    row.addEventListener("drop", () => {
-      const ids = Array.from(tbody.querySelectorAll("tr[data-id]:not(.task-detail-row)")).map(r => r.dataset.id);
-      state.tasks.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
-      persistOrder();
+    row.addEventListener("pointerdown", (e) => {
+      if (e.target.matches('input[data-field="name"]')) return;
+      if (e.button !== 0) return;
+      const detailEl = tbody.querySelector(`tr.task-detail-row[data-id="${row.dataset.id}"]`);
+      dragTracking = { row, detailEl, startX: e.clientX, startY: e.clientY, dragging: false };
     });
   });
 }
@@ -1273,6 +1264,33 @@ function wireViewNav() {
 
 // ---------- mobile gantt overlay ----------
 function wireStaticUI() {
+  document.addEventListener("pointermove", (e) => {
+    if (!dragTracking) return;
+    if (!dragTracking.dragging) {
+      const moved = Math.hypot(e.clientX - dragTracking.startX, e.clientY - dragTracking.startY);
+      if (moved < DRAG_THRESHOLD) return;
+      dragTracking.dragging = true;
+      dragTracking.row.classList.add("dragging");
+    }
+    const overRow = document.elementFromPoint(e.clientX, e.clientY)?.closest("tr[data-id]:not(.task-detail-row)");
+    if (!overRow || overRow === dragTracking.row) return;
+    const rect = overRow.getBoundingClientRect();
+    const before = (e.clientY - rect.top) < rect.height / 2;
+    const targetDetail = overRow.parentNode.querySelector(`tr.task-detail-row[data-id="${overRow.dataset.id}"]`);
+    overRow.parentNode.insertBefore(dragTracking.row, before ? overRow : (targetDetail ? targetDetail.nextSibling : overRow.nextSibling));
+    if (dragTracking.detailEl) overRow.parentNode.insertBefore(dragTracking.detailEl, dragTracking.row.nextSibling);
+  });
+  document.addEventListener("pointerup", () => {
+    if (!dragTracking) return;
+    if (dragTracking.dragging) {
+      dragTracking.row.classList.remove("dragging");
+      const tbody = $("#taskTbody");
+      const ids = Array.from(tbody.querySelectorAll("tr[data-id]:not(.task-detail-row)")).map(r => r.dataset.id);
+      state.tasks.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+      persistOrder();
+    }
+    dragTracking = null;
+  });
   const wireFilterPair = (key, ids) => {
     ids.forEach(id => {
       const el = $(id);
