@@ -47,23 +47,12 @@ function wireAuthUI() {
     location.reload();
   });
 }
-function applyAuthUI(hasOwnChecklist) {
+function applyAuthUI() {
   const loggedIn = !!currentUser;
   $("#googleLoginBtn").hidden = loggedIn;
   $("#googleLogoutBtn").hidden = !loggedIn;
   $("#checklistUserInfo").hidden = !loggedIn;
   if (loggedIn) $("#checklistUserInfo").textContent = currentUser.email || currentUser.user_metadata?.name || "로그인됨";
-  const newChecklistBtn = $("#newChecklistBtn");
-  if (!loggedIn) {
-    newChecklistBtn.disabled = true;
-    newChecklistBtn.title = "먼저 Google로 로그인해주세요";
-  } else if (hasOwnChecklist) {
-    newChecklistBtn.disabled = true;
-    newChecklistBtn.title = "체크리스트는 계정당 1개까지만 만들 수 있어요";
-  } else {
-    newChecklistBtn.disabled = false;
-    newChecklistBtn.title = "";
-  }
 }
 
 // ---------- light / dark theme toggle ----------
@@ -253,7 +242,7 @@ async function enterLanding() {
   renderLanding();
   wireLandingUI();
   const myChecklist = currentUser ? landingProjects.find(p => p.type === "checklist" && p.owner_user_id === currentUser.id) : null;
-  applyAuthUI(!!myChecklist);
+  applyAuthUI();
   const shortcut = $("#myChecklistShortcut");
   shortcut.hidden = !myChecklist;
   if (myChecklist) shortcut.href = "?p=" + myChecklist.id;
@@ -360,20 +349,17 @@ async function deleteProjects(ids) {
 function wireLandingUI() {
   $("#bulkDeleteBtn").addEventListener("click", () => deleteProjects([...selectedProjectIds]));
   $("#bulkClearBtn").addEventListener("click", () => { selectedProjectIds.clear(); renderLanding(); });
-  const createProject = async (type) => {
-    if (type === "checklist" && !currentUser) { $("#googleLoginBtn").click(); return; }
+  const createProject = async () => {
     const org = $("#newOrgInput").value.trim();
     const dept = $("#newDeptInput").value.trim();
-    const pm = type === "checklist" ? "" : $("#newPmInput").value.trim();
+    const pm = $("#newPmInput").value.trim();
     const name = $("#newNameInput").value.trim();
     if (!name) { $("#newNameInput").focus(); return; }
-    const ownerFields = type === "checklist" ? { owner_user_id: currentUser.id } : {};
-    const { data, error } = await supabase.from("projects").insert({ org, dept, pm, name, mode: "view", status: "todo", type, ...ownerFields }).select().single();
+    const { data, error } = await supabase.from("projects").insert({ org, dept, pm, name, mode: "view", status: "todo", type: "timeline" }).select().single();
     if (error) { console.error(error); alert("만들기에 실패했습니다: " + error.message); return; }
     location.href = "?p=" + data.id;
   };
-  $("#newProjectBtn").addEventListener("click", () => createProject("timeline"));
-  $("#newChecklistBtn").addEventListener("click", () => createProject("checklist"));
+  $("#newProjectBtn").addEventListener("click", createProject);
 }
 
 // ---------- project detail ----------

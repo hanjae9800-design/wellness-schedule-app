@@ -18,6 +18,11 @@
     <div class="admin-head">
       <h1 class="landing-title">야 너도 PM 할수있어</h1>
       <div class="admin-head-links">
+        <div class="checklist-auth-area" id="checklistAuthArea">
+          <button type="button" class="secondary" id="googleLoginBtn" hidden>Google로 로그인</button>
+          <span class="checklist-user-info" id="checklistUserInfo" hidden></span>
+          <button type="button" class="link-btn" id="googleLogoutBtn" hidden>로그아웃</button>
+        </div>
         <a href="#" class="back-link my-checklist-link" id="myChecklistShortcut" hidden>📋 내 업무 체크리스트</a>
         <a href="./admin/" class="back-link">관리자</a>
       </div>
@@ -31,14 +36,6 @@
     <h2 class="landing-section-title">프로젝트</h2>
     <div class="project-list" id="projectList"></div>
 
-    <div class="landing-section-head">
-      <h2 class="landing-section-title">업무 체크리스트</h2>
-      <div class="checklist-auth-area" id="checklistAuthArea">
-        <button type="button" class="secondary" id="googleLoginBtn" hidden>Google로 로그인</button>
-        <span class="checklist-user-info" id="checklistUserInfo" hidden></span>
-        <button type="button" class="link-btn" id="googleLogoutBtn" hidden>로그아웃</button>
-      </div>
-    </div>
     <div class="new-project-box">
       <h2>+ 새로 만들기</h2>
       <div class="new-project-fields">
@@ -47,7 +44,6 @@
         <input id="newPmInput" placeholder="PM(담당자)">
         <input id="newNameInput" placeholder="프로젝트명 / 체크리스트명">
         <button class="primary" id="newProjectBtn">새 프로젝트 만들기</button>
-        <button class="secondary" id="newChecklistBtn">내 업무 체크리스트 만들기</button>
       </div>
     </div>
   </div>
