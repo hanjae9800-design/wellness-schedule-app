@@ -106,7 +106,7 @@ function renderFilterOptions() {
 }
 function applyTaskFilters() {
   const byOwner = viewMode === "owner";
-  $$("#taskTbody tr[data-id]").forEach(row => {
+  $$("#taskTbody tr[data-id]:not(.task-detail-row)").forEach(row => {
     const t = state.tasks.find(x => x.id === row.dataset.id);
     const groupCollapsed = t && (byOwner ? isOwnerCollapsed(t.owner) : isPhaseCollapsed(t.phase_name, "table"));
     row.hidden = !(t && taskMatchesFilters(t)) || groupCollapsed;
