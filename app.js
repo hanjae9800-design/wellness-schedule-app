@@ -10,7 +10,7 @@ const DAYPX = 20;
 
 let state = { project: null, tasks: [], editMode: false };
 let saveTimers = new Map();
-let taskFilters = { phase: "", status: "", owner: "" };
+let taskFilters = { phase: "", status: "", owner: "", today: false };
 // gantt and table collapse state are independent: collapsing a 구분 in one view doesn't affect the other.
 let collapsedPhasesGantt = new Set();
 let collapsedPhasesTable = new Set();
@@ -90,6 +90,11 @@ function taskMatchesFilters(t) {
   if (taskFilters.phase && (t.phase_name || "") !== taskFilters.phase) return false;
   if (taskFilters.status && deriveTaskStatus(t).key !== taskFilters.status) return false;
   if (taskFilters.owner && (t.owner || "") !== taskFilters.owner) return false;
+  if (taskFilters.today) {
+    const today = new Date().toISOString().slice(0, 10);
+    if (t.start_date && t.start_date > today) return false;
+    if (t.end_date && t.end_date < today) return false;
+  }
   return true;
 }
 function renderFilterOptions() {
@@ -115,6 +120,27 @@ function applyTaskFilters() {
     const t = state.tasks.find(x => x.id === card.dataset.id);
     card.hidden = !(t && taskMatchesFilters(t));
   });
+}
+function wireTodayFilter() {
+  ["#todayFilterBtn", "#todayFilterBtnMobile"].forEach(sel => {
+    const btn = $(sel);
+    btn.classList.toggle("active", taskFilters.today);
+    btn.addEventListener("click", () => {
+      taskFilters.today = !taskFilters.today;
+      $$(".today-filter-btn").forEach(b => b.classList.toggle("active", taskFilters.today));
+      applyTaskFilters();
+    });
+  });
+}
+function applyChecklistModeUI() {
+  const isChecklist = state.project.type === "checklist";
+  $("#viewNavToggleBtn").hidden = isChecklist;
+  $("#todayFilterBtn").hidden = !isChecklist;
+  $("#todayFilterBtnMobile").hidden = !isChecklist;
+  if (isChecklist) {
+    taskFilters.today = true;
+    wireTodayFilter();
+  }
 }
 function getAssigneeOptions() {
   const p = state.project;
@@ -196,34 +222,30 @@ async function loadLandingProgress() {
   });
   landingProgress = stats;
 }
-function renderLanding() {
-  const list = $("#projectList");
-  if (!landingProjects.length) {
-    list.innerHTML = `<div class="empty-note">아직 만들어진 프로젝트가 없습니다. 아래에서 새로 만들어보세요.</div>`;
-  } else {
-    list.innerHTML = landingProjects.map(p => {
-      const prog = landingProgress[p.id];
-      const total = prog ? prog.total : 0;
-      const done = prog ? prog.done : 0;
-      const pct = total ? Math.round(done / total * 100) : 0;
-      const st = deriveProjectStatusFromMinStart(p.status || "todo", prog ? prog.minStart : null);
-      return `
-      <div class="project-card" data-id="${p.id}">
-        <label class="pc-check"><input type="checkbox" class="pc-checkbox" data-id="${p.id}" ${selectedProjectIds.has(p.id) ? "checked" : ""}></label>
-        <a class="pc-body" href="?p=${p.id}">
-          <div class="pc-eyebrow">${escapeHtml(p.org || "")}${p.dept ? " / " + escapeHtml(p.dept) : ""}${p.pm ? " / PM " + escapeHtml(p.pm) : ""}</div>
-          <div class="pc-name">${escapeHtml(p.name || "(제목 없음)")} 추진일정</div>
-          <div class="pc-meta">생성일 ${p.created_at ? p.created_at.slice(0, 10) : ""} · <span class="proj-status-badge ${st.key}">${st.label}</span> · <span class="pc-mode ${p.mode === "edit" ? "edit" : ""}">${p.mode === "edit" ? "✏️ 편집 가능" : "🔒 보기 전용"}</span></div>
-          <div class="pc-progress">
-            <div class="pc-progress-bar"><div class="pc-progress-fill" style="width:${pct}%"></div></div>
-            <span class="pc-progress-label">${total ? `${pct}% (${done}/${total})` : "업무 없음"}</span>
-          </div>
-        </a>
-        <button type="button" class="pc-del" data-id="${p.id}" aria-label="삭제">✕</button>
+function buildProjectCardHtml(p) {
+  const prog = landingProgress[p.id];
+  const total = prog ? prog.total : 0;
+  const done = prog ? prog.done : 0;
+  const pct = total ? Math.round(done / total * 100) : 0;
+  const st = deriveProjectStatusFromMinStart(p.status || "todo", prog ? prog.minStart : null);
+  const isChecklist = p.type === "checklist";
+  return `
+  <div class="project-card" data-id="${p.id}">
+    <label class="pc-check"><input type="checkbox" class="pc-checkbox" data-id="${p.id}" ${selectedProjectIds.has(p.id) ? "checked" : ""}></label>
+    <a class="pc-body" href="?p=${p.id}">
+      <div class="pc-eyebrow">${escapeHtml(p.org || "")}${p.dept ? " / " + escapeHtml(p.dept) : ""}${p.pm ? " / PM " + escapeHtml(p.pm) : ""}</div>
+      <div class="pc-name">${escapeHtml(p.name || "(제목 없음)")}${isChecklist ? "" : " 추진일정"}</div>
+      <div class="pc-meta">생성일 ${p.created_at ? p.created_at.slice(0, 10) : ""} · <span class="proj-status-badge ${st.key}">${st.label}</span> · <span class="pc-mode ${p.mode === "edit" ? "edit" : ""}">${p.mode === "edit" ? "✏️ 편집 가능" : "🔒 보기 전용"}</span></div>
+      <div class="pc-progress">
+        <div class="pc-progress-bar"><div class="pc-progress-fill" style="width:${pct}%"></div></div>
+        <span class="pc-progress-label">${total ? `${pct}% (${done}/${total})` : "업무 없음"}</span>
       </div>
-    `;
-    }).join("");
-  }
+    </a>
+    <button type="button" class="pc-del" data-id="${p.id}" aria-label="삭제">✕</button>
+  </div>
+`;
+}
+function wireProjectCardList(list) {
   list.querySelectorAll(".pc-checkbox").forEach(cb => {
     cb.addEventListener("change", () => {
       if (cb.checked) selectedProjectIds.add(cb.dataset.id);
@@ -234,6 +256,19 @@ function renderLanding() {
   list.querySelectorAll(".pc-del").forEach(btn => {
     btn.addEventListener("click", () => deleteProjects([btn.dataset.id]));
   });
+}
+function renderProjectGroup(selector, projects, emptyText) {
+  const list = $(selector);
+  list.innerHTML = projects.length
+    ? projects.map(buildProjectCardHtml).join("")
+    : `<div class="empty-note">${emptyText}</div>`;
+  wireProjectCardList(list);
+}
+function renderLanding() {
+  const timelineProjects = landingProjects.filter(p => p.type !== "checklist");
+  const checklistProjects = landingProjects.filter(p => p.type === "checklist");
+  renderProjectGroup("#projectList", timelineProjects, "아직 만들어진 프로젝트가 없습니다. 아래에서 새로 만들어보세요.");
+  renderProjectGroup("#checklistList", checklistProjects, "아직 만들어진 업무 체크리스트가 없습니다. 아래에서 새로 만들어보세요.");
   updateBulkBar();
 }
 function updateBulkBar() {
@@ -258,16 +293,18 @@ async function deleteProjects(ids) {
 function wireLandingUI() {
   $("#bulkDeleteBtn").addEventListener("click", () => deleteProjects([...selectedProjectIds]));
   $("#bulkClearBtn").addEventListener("click", () => { selectedProjectIds.clear(); renderLanding(); });
-  $("#newProjectBtn").addEventListener("click", async () => {
+  const createProject = async (type) => {
     const org = $("#newOrgInput").value.trim();
     const dept = $("#newDeptInput").value.trim();
     const pm = $("#newPmInput").value.trim();
     const name = $("#newNameInput").value.trim();
     if (!name) { $("#newNameInput").focus(); return; }
-    const { data, error } = await supabase.from("projects").insert({ org, dept, pm, name, mode: "view", status: "todo" }).select().single();
+    const { data, error } = await supabase.from("projects").insert({ org, dept, pm, name, mode: "view", status: "todo", type }).select().single();
     if (error) { console.error(error); return; }
     location.href = "?p=" + data.id;
-  });
+  };
+  $("#newProjectBtn").addEventListener("click", () => createProject("timeline"));
+  $("#newChecklistBtn").addEventListener("click", () => createProject("checklist"));
 }
 
 // ---------- project detail ----------
@@ -277,11 +314,12 @@ async function enterProject(projectId) {
   collapsedPhasesGantt = loadCollapsedPhases(state.project.id, "gantt");
   collapsedPhasesTable = loadCollapsedPhases(state.project.id, "table");
   collapsedOwnersTable = loadCollapsedOwners(state.project.id);
-  viewMode = loadViewMode(state.project.id);
+  viewMode = state.project.type === "checklist" ? "all" : loadViewMode(state.project.id);
   logPageView("project", projectId);
   await loadTasks();
   state.editMode = state.project.mode === "edit";
   $("#app").hidden = false;
+  applyChecklistModeUI();
   renderAll();
   applyViewMode();
   wireStaticUI();

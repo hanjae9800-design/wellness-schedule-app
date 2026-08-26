@@ -25,15 +25,21 @@
       <button type="button" class="danger" id="bulkDeleteBtn">선택 삭제</button>
       <button type="button" class="link-btn" id="bulkClearBtn">선택 해제</button>
     </div>
+    <h2 class="landing-section-title">프로젝트</h2>
     <div class="project-list" id="projectList"></div>
+
+    <h2 class="landing-section-title">업무 체크리스트</h2>
+    <div class="project-list" id="checklistList"></div>
+
     <div class="new-project-box">
-      <h2>+ 새 프로젝트 만들기</h2>
+      <h2>+ 새로 만들기</h2>
       <div class="new-project-fields">
         <input id="newOrgInput" placeholder="상위 사업명">
         <input id="newDeptInput" placeholder="부서명">
         <input id="newPmInput" placeholder="PM(담당자)">
-        <input id="newNameInput" placeholder="프로젝트명 (예: 웰니스관광)">
-        <button class="primary" id="newProjectBtn">만들기</button>
+        <input id="newNameInput" placeholder="프로젝트명 / 체크리스트명">
+        <button class="primary" id="newProjectBtn">새 프로젝트 만들기</button>
+        <button class="secondary" id="newChecklistBtn">내 업무 체크리스트 만들기</button>
       </div>
     </div>
   </div>
@@ -103,6 +109,7 @@
     <div class="view-group" id="tableViewGroup">
     <div class="section-head">
       <h2 id="tableSectionTitle">업무 목록</h2>
+      <button type="button" class="secondary today-filter-btn" id="todayFilterBtn" hidden>오늘 업무만 보기</button>
     </div>
     <div class="table-scroll">
       <table class="task-table" id="taskTable">
@@ -137,6 +144,7 @@
   <section class="cards mobile-only">
     <div class="board-toolbar">
       <button class="secondary" id="timelineOpenBtn">📊 타임라인 차트 보기</button>
+      <button class="secondary today-filter-btn" id="todayFilterBtnMobile" hidden>오늘 업무만 보기</button>
     </div>
     <div class="mobile-filter-row">
       <select id="filterPhaseMobile" class="th-filter-select mobile"><option value="">구분</option></select>
