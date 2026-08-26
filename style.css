@@ -87,6 +87,10 @@ button { font-family: inherit; }
 .pc-progress-label { flex: none; font-size: 11px; color: var(--ink-muted); }
 .project-card .pc-del { flex: none; background: none; border: none; color: var(--ink-muted); cursor: pointer; font-size: 15px; padding: 6px 8px; border-radius: 8px; }
 .project-card .pc-del:hover { color: var(--critical); background: var(--surface-alt); }
+.project-card.pc-compact { padding: 6px 8px 6px 12px; }
+.project-card.pc-compact .pc-body { padding: 4px 6px; }
+.project-card.pc-compact .pc-name { font-size: 13.5px; }
+.project-card.pc-compact .pc-progress { display: none; }
 .empty-note { color: var(--ink-muted); font-size: 13px; padding: 16px; text-align: center; }
 
 .bulk-bar { display: flex; align-items: center; gap: 12px; background: var(--surface-alt); border: 1px solid var(--border-strong); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; font-size: 13px; }
@@ -100,6 +104,8 @@ button { font-family: inherit; }
 .back-link { font-size: 12px; color: var(--ink-muted); text-decoration: none; border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; }
 .back-link:hover { border-color: var(--accent); color: var(--accent); }
 .admin-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.admin-head-links { display: flex; align-items: center; gap: 8px; }
+.my-checklist-link { color: var(--accent); border-color: var(--accent); font-weight: 700; }
 
 button.primary { background: var(--accent); color: var(--accent-ink); border: none; border-radius: 9px; padding: 10px 16px; font-weight: 700; font-size: 13.5px; cursor: pointer; }
 button.secondary { background: var(--surface); border: 1px solid var(--border-strong); color: var(--ink); border-radius: 9px; padding: 10px 16px; font-weight: 700; font-size: 13.5px; cursor: pointer; }

@@ -254,8 +254,11 @@ async function enterLanding() {
   await loadLandingProgress();
   renderLanding();
   wireLandingUI();
-  const hasOwnChecklist = !!currentUser && landingProjects.some(p => p.type === "checklist" && p.owner_user_id === currentUser.id);
-  applyAuthUI(hasOwnChecklist);
+  const myChecklist = currentUser ? landingProjects.find(p => p.type === "checklist" && p.owner_user_id === currentUser.id) : null;
+  applyAuthUI(!!myChecklist);
+  const shortcut = $("#myChecklistShortcut");
+  shortcut.hidden = !myChecklist;
+  if (myChecklist) shortcut.href = "?p=" + myChecklist.id;
   $("#landing").hidden = false;
 }
 async function loadLandingProgress() {
@@ -279,7 +282,7 @@ function buildProjectCardHtml(p) {
   const st = deriveProjectStatusFromMinStart(p.status || "todo", prog ? prog.minStart : null);
   const isChecklist = p.type === "checklist";
   return `
-  <div class="project-card" data-id="${p.id}">
+  <div class="project-card${isChecklist ? " pc-compact" : ""}" data-id="${p.id}">
     <label class="pc-check"><input type="checkbox" class="pc-checkbox" data-id="${p.id}" ${selectedProjectIds.has(p.id) ? "checked" : ""}></label>
     <a class="pc-body" href="?p=${p.id}">
       <div class="pc-eyebrow">${escapeHtml(p.org || "")}${p.dept ? " / " + escapeHtml(p.dept) : ""}${!isChecklist && p.pm ? " / PM " + escapeHtml(p.pm) : ""}</div>
