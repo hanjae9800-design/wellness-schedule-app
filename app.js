@@ -346,16 +346,59 @@ async function deleteProjects(ids) {
   ids.forEach(id => selectedProjectIds.delete(id));
   renderLanding();
 }
+let newProjectTeamMembers = [];
+function renderNewProjectTeamChips() {
+  const row = $("#newTeamChipRow");
+  row.innerHTML = newProjectTeamMembers.map(name => `
+    <span class="team-chip">${escapeHtml(name)}<button type="button" class="team-chip-del" data-name="${escapeHtml(name)}" aria-label="삭제">✕</button></span>
+  `).join("");
+  row.querySelectorAll(".team-chip-del").forEach(btn => {
+    btn.addEventListener("click", () => {
+      newProjectTeamMembers = newProjectTeamMembers.filter(n => n !== btn.dataset.name);
+      renderNewProjectTeamChips();
+    });
+  });
+}
+function addNewProjectTeamMember() {
+  const input = $("#newTeamInput");
+  const name = input.value.trim();
+  if (!name) return;
+  if (!newProjectTeamMembers.includes(name)) newProjectTeamMembers.push(name);
+  input.value = "";
+  renderNewProjectTeamChips();
+  input.focus();
+}
+function openNewProjectModal() {
+  $("#newOrgInput").value = "";
+  $("#newDeptInput").value = "";
+  $("#newPmInput").value = "";
+  $("#newNameInput").value = "";
+  $("#newTeamInput").value = "";
+  newProjectTeamMembers = [];
+  renderNewProjectTeamChips();
+  $("#newProjectModal").hidden = false;
+  $("#newOrgInput").focus();
+}
+function closeNewProjectModal() {
+  $("#newProjectModal").hidden = true;
+}
 function wireLandingUI() {
   $("#bulkDeleteBtn").addEventListener("click", () => deleteProjects([...selectedProjectIds]));
   $("#bulkClearBtn").addEventListener("click", () => { selectedProjectIds.clear(); renderLanding(); });
+  $("#newProjectOpenBtn").addEventListener("click", openNewProjectModal);
+  $("#newProjectCancelBtn").addEventListener("click", closeNewProjectModal);
+  $("#newTeamAddBtn").addEventListener("click", addNewProjectTeamMember);
+  $("#newTeamInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); addNewProjectTeamMember(); }
+  });
   const createProject = async () => {
     const org = $("#newOrgInput").value.trim();
     const dept = $("#newDeptInput").value.trim();
     const pm = $("#newPmInput").value.trim();
     const name = $("#newNameInput").value.trim();
     if (!name) { $("#newNameInput").focus(); return; }
-    const { data, error } = await supabase.from("projects").insert({ org, dept, pm, name, mode: "view", status: "todo", type: "timeline" }).select().single();
+    const team_members = newProjectTeamMembers.join(", ");
+    const { data, error } = await supabase.from("projects").insert({ org, dept, pm, name, team_members, mode: "view", status: "todo", type: "timeline" }).select().single();
     if (error) { console.error(error); alert("만들기에 실패했습니다: " + error.message); return; }
     location.href = "?p=" + data.id;
   };

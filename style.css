@@ -98,10 +98,14 @@ button { font-family: inherit; }
 .bulk-bar #bulkCount { font-weight: 700; color: var(--ink); }
 .bulk-bar button.danger { background: var(--critical); color: #fff; border: none; border-radius: 8px; padding: 7px 12px; font-weight: 700; font-size: 12.5px; cursor: pointer; }
 .bulk-bar .link-btn { background: none; border: none; color: var(--ink-muted); text-decoration: underline; font-size: 12.5px; cursor: pointer; padding: 0; }
-.new-project-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
-.new-project-box h2 { font-size: 14px; margin: 0 0 12px; }
-.new-project-fields { display: flex; gap: 8px; flex-wrap: wrap; }
-.new-project-fields input { flex: 1; min-width: 140px; font: inherit; font-size: 13.5px; padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: 9px; background: var(--page); color: var(--ink); }
+.project-list-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 22px 0 10px; }
+.project-list-head .landing-section-title { margin: 0; }
+.new-project-modal-fields { display: flex; flex-direction: column; gap: 10px; }
+.new-project-modal-fields input { width: 100%; font: inherit; font-size: 13.5px; padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: 9px; background: var(--page); color: var(--ink); }
+.np-team-field { display: flex; flex-direction: column; gap: 8px; }
+.np-team-input-row { display: flex; gap: 8px; }
+.np-team-input-row input { flex: 1; }
+.np-team-input-row button { flex-shrink: 0; padding: 10px 14px; }
 .back-link { font-size: 12px; color: var(--ink-muted); text-decoration: none; border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; }
 .back-link:hover { border-color: var(--accent); color: var(--accent); }
 .admin-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
