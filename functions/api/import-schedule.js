@@ -1,7 +1,7 @@
 // POST /api/import-schedule
 // multipart/form-data: file (txt/md/pdf)
 // Gemini API 키는 여기(서버)에서만 쓰고 브라우저에는 절대 내려주지 않습니다.
-const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_MODEL = "gemini-3.6-flash";
 const MAX_FILE_BYTES = 15 * 1024 * 1024;
 
 const RESPONSE_SCHEMA = {
