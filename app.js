@@ -87,13 +87,17 @@ function fmtDate(d) {
 function daysBetween(a, b) {
   return Math.round((new Date(b) - new Date(a)) / 86400000);
 }
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 // ---------- project-level status (예정 / 지연 / 진행중 / 완료) ----------
 function deriveProjectStatusFromMinStart(status, minStart) {
   if (status === "doing") return { key: "doing", label: "진행중" };
   if (status === "done") return { key: "done", label: "완료" };
   if (!minStart) return { key: "todo", label: "예정" };
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayStr();
   if (minStart < today) return { key: "delayed", label: "지연" };
   return { key: "todo", label: "예정" };
 }
@@ -108,7 +112,7 @@ function deriveTaskStatus(t) {
   if (t.status === "doing") return { key: "doing", label: "진행중" };
   if (t.status === "done") return { key: "done", label: "완료" };
   if (t.start_date) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayStr();
     if (t.start_date < today) return { key: "delayed", label: "지연" };
   }
   return { key: "todo", label: "예정" };
@@ -121,7 +125,7 @@ function taskMatchesFilters(t) {
   if (taskFilters.status && deriveTaskStatus(t).key !== taskFilters.status) return false;
   if (taskFilters.owner && (t.owner || "") !== taskFilters.owner) return false;
   if (taskFilters.today) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayStr();
     if (t.start_date && t.start_date > today) return false;
     if (t.end_date && t.end_date < today) return false;
   }
@@ -1170,7 +1174,7 @@ function buildGanttTaskRowHtml(t, minDate, daypx, trackWidth, rowWidth) {
 function buildGanttHtml(tasks, daypx, grouped = true, extendRange = false) {
   const dated = tasks.filter(t => t.start_date && t.end_date);
   if (!dated.length) return `<div style="color:var(--ink-muted);font-size:12px;padding:10px;">시작일/종료일을 입력하면 타임라인이 표시됩니다.</div>`;
-  const minDate = dated.reduce((m, t) => t.start_date < m ? t.start_date : m, dated[0].start_date);
+  let minDate = dated.reduce((m, t) => t.start_date < m ? t.start_date : m, dated[0].start_date);
   let maxDate = dated.reduce((m, t) => t.end_date > m ? t.end_date : m, dated[0].end_date);
   if (extendRange) {
     const minEnd = new Date(minDate);
@@ -1179,6 +1183,9 @@ function buildGanttHtml(tasks, daypx, grouped = true, extendRange = false) {
     const minEndStr = minEnd.toISOString().slice(0, 10);
     if (minEndStr > maxDate) maxDate = minEndStr;
   }
+  const today = todayStr();
+  if (today < minDate) minDate = today;
+  if (today > maxDate) maxDate = today;
   const totalDays = Math.max(1, daysBetween(minDate, maxDate) + 1);
   const trackWidth = totalDays * daypx;
   const rowWidth = ganttLabelWidth + trackWidth;
@@ -1242,11 +1249,10 @@ function buildGanttHtml(tasks, daypx, grouped = true, extendRange = false) {
     }
   });
 
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const todayOffsetDays = daysBetween(minDate, todayStr);
+  const todayOffsetDays = daysBetween(minDate, today);
   if (todayOffsetDays >= 0 && todayOffsetDays <= totalDays) {
     const todayLeft = ganttLabelWidth + todayOffsetDays * daypx;
-    const todayLabelDate = new Date(todayStr);
+    const todayLabelDate = new Date(today);
     html += `<div class="gantt-today-line" style="left:${todayLeft}px"><span class="gantt-today-label">오늘 (${todayLabelDate.getMonth() + 1}/${todayLabelDate.getDate()})</span></div>`;
   }
   return html;
