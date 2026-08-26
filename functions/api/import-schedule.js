@@ -4,27 +4,6 @@
 const GEMINI_MODEL = "gemini-3.6-flash";
 const MAX_FILE_BYTES = 15 * 1024 * 1024;
 
-const RESPONSE_SCHEMA = {
-  type: "object",
-  properties: {
-    tasks: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          phase_name: { type: "string" },
-          name: { type: "string" },
-          start_date: { type: "string" },
-          end_date: { type: "string" },
-          owner: { type: "string" }
-        },
-        required: ["phase_name", "name"]
-      }
-    }
-  },
-  required: ["tasks"]
-};
-
 const PROMPT = `첨부된 문서는 프로젝트 추진 계획/일정 관련 자료입니다. 이 문서를 분석해서, 프로젝트를 구성하는 업무(task) 목록을 뽑아주세요.
 
 각 업무마다 다음 정보를 채워주세요:
@@ -33,7 +12,14 @@ const PROMPT = `첨부된 문서는 프로젝트 추진 계획/일정 관련 자
 - start_date, end_date: "YYYY-MM-DD" 형식. 문서에 정확한 날짜가 없고 "O월"처럼 월만 있으면 그 달의 1일/말일로, 아예 일정 정보가 없으면 빈 문자열("")로 두세요.
 - owner: 담당자 이름. 문서에 없으면 빈 문자열("")
 
-문서에 나온 순서를 최대한 존중해서 나열해주세요.`;
+문서에 나온 순서를 최대한 존중해서 나열해주세요.
+
+다음과 같은 정확한 JSON 형식으로만 답하세요 (다른 텍스트 없이 이 형식 그대로):
+{"tasks":[{"phase_name":"기획","name":"사업 계획서 작성","start_date":"2026-01-05","end_date":"2026-01-20","owner":"김담당"}]}
+
+찾은 업무가 하나도 없더라도 반드시 위 형식을 따르되 tasks 배열만 비워주세요: {"tasks":[]}
+
+중요: 각 JSON 필드 값에는 오직 그 값 자체만 넣으세요. 추론 과정, 확인 문구, 대안 검토, 주석 같은 것을 필드 값 안에 절대 섞지 마세요. 예를 들어 start_date 필드에는 "2026-01-05" 처럼 날짜만 들어가야 하고, "2026-01-05 (확인 필요)" 같은 식으로 다른 텍스트를 덧붙이면 안 됩니다.`;
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -82,8 +68,7 @@ export async function onRequestPost(context) {
         body: JSON.stringify({
           contents: [{ parts }],
           generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: RESPONSE_SCHEMA
+            responseMimeType: "application/json"
           }
         })
       }
@@ -98,9 +83,12 @@ export async function onRequestPost(context) {
   }
 
   const data = await geminiRes.json();
-  const rawText = data && data.candidates && data.candidates[0] && data.candidates[0].content
-    && data.candidates[0].content.parts && data.candidates[0].content.parts[0]
-    && data.candidates[0].content.parts[0].text;
+  const candidateParts = (data && data.candidates && data.candidates[0] && data.candidates[0].content
+    && data.candidates[0].content.parts) || [];
+  // 최신 Gemini 모델은 "생각하는 과정"(thought: true)과 최종 답변을 parts 배열에 나눠서 보내므로,
+  // thought가 아닌 실제 답변 조각을 찾아서 써야 함.
+  const answerPart = candidateParts.find(p => !p.thought && typeof p.text === "string");
+  const rawText = answerPart && answerPart.text;
   if (!rawText) {
     return json({ error: "AI 응답을 읽을 수 없습니다." }, 502);
   }
