@@ -164,6 +164,22 @@
   <div class="color-picker" id="colorPicker" hidden></div>
   <div class="dep-picker-popover" id="depPicker" hidden></div>
   <div class="dep-picker-popover" id="phaseStatPopover" hidden></div>
+
+  <div class="import-drop-overlay" id="importDropOverlay" hidden>
+    <div class="import-drop-msg">📄 파일을 놓으면 자동으로 일정이 생성됩니다</div>
+  </div>
+  <div class="feedback-modal" id="importModeModal" hidden>
+    <div class="feedback-modal-box">
+      <h2>업무 가져오기</h2>
+      <p class="feedback-modal-sub"><span id="importFileName"></span> 파일을 분석해서 업무를 만듭니다. 기존 업무는 어떻게 할까요?</p>
+      <div class="feedback-modal-actions">
+        <button class="secondary" id="importModeCancelBtn" type="button">취소</button>
+        <button class="secondary" id="importModeOverwriteBtn" type="button">기존 업무 지우고 새로</button>
+        <button class="primary" id="importModeAppendBtn" type="button">기존 업무에 추가</button>
+      </div>
+    </div>
+  </div>
+  <div class="import-status-banner" id="importStatusBanner" hidden></div>
 </div>
 
 <button id="feedbackFab" class="feedback-fab" type="button">💬 불편사항 제보</button>

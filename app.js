@@ -287,6 +287,7 @@ async function enterProject(projectId) {
   wireStaticUI();
   wireModeToggle();
   wireViewNav();
+  wireFileImportDragDrop();
   subscribeRealtime();
 }
 
@@ -1422,6 +1423,119 @@ function wireFeedbackUI() {
     statusEl.textContent = "제보해주셔서 감사합니다!";
     setTimeout(closeModal, 1200);
   });
+}
+
+// ---------- 파일 드래그앤드롭 → AI가 읽고 업무 자동 생성 ----------
+const IMPORT_ALLOWED_EXT = /\.(txt|md|markdown|pdf)$/i;
+let importDragDepth = 0;
+
+function wireFileImportDragDrop() {
+  const overlay = $("#importDropOverlay");
+  const hasFiles = (e) => e.dataTransfer && Array.from(e.dataTransfer.types || []).includes("Files");
+
+  window.addEventListener("dragenter", (e) => {
+    if (!state.project || !state.editMode || !hasFiles(e)) return;
+    importDragDepth++;
+    overlay.hidden = false;
+  });
+  window.addEventListener("dragover", (e) => {
+    if (overlay.hidden) return;
+    e.preventDefault();
+  });
+  window.addEventListener("dragleave", () => {
+    if (importDragDepth === 0) return;
+    importDragDepth--;
+    if (importDragDepth === 0) overlay.hidden = true;
+  });
+  window.addEventListener("drop", async (e) => {
+    if (!state.project || !state.editMode) return;
+    e.preventDefault();
+    importDragDepth = 0;
+    overlay.hidden = true;
+    const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (file) await startFileImport(file);
+  });
+}
+
+function showImportStatus(text, autoHideMs) {
+  const el = $("#importStatusBanner");
+  el.textContent = text;
+  el.hidden = false;
+  if (autoHideMs) setTimeout(() => { el.hidden = true; }, autoHideMs);
+}
+
+function openImportModePopup(fileName) {
+  return new Promise((resolve) => {
+    const modal = $("#importModeModal");
+    $("#importFileName").textContent = fileName;
+    modal.hidden = false;
+    const done = (result) => { modal.hidden = true; resolve(result); };
+    $("#importModeCancelBtn").onclick = () => done(null);
+    $("#importModeOverwriteBtn").onclick = () => done("overwrite");
+    $("#importModeAppendBtn").onclick = () => done("append");
+  });
+}
+
+async function startFileImport(file) {
+  if (!IMPORT_ALLOWED_EXT.test(file.name)) {
+    showImportStatus("txt, md, pdf 파일만 지원합니다.", 4000);
+    return;
+  }
+  const mode = await openImportModePopup(file.name);
+  if (!mode) return;
+
+  showImportStatus("AI가 파일을 분석하고 있습니다...");
+  try {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch("/api/import-schedule", { method: "POST", body: form });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "가져오기 요청이 실패했습니다.");
+    const tasks = Array.isArray(data.tasks) ? data.tasks : [];
+    if (!tasks.length) { showImportStatus("문서에서 업무를 찾지 못했습니다.", 4000); return; }
+    await applyImportedTasks(tasks, mode);
+    showImportStatus(`${tasks.length}개 업무를 가져왔습니다.`, 3000);
+  } catch (e) {
+    console.error(e);
+    showImportStatus("가져오기 실패: " + (e.message || "알 수 없는 오류"), 5000);
+  }
+}
+
+function normalizeImportDate(v) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(v || "") ? v : null;
+}
+
+async function applyImportedTasks(tasks, mode) {
+  if (mode === "overwrite") {
+    await supabase.from("tasks").delete().eq("project_id", state.project.id);
+    state.tasks = [];
+  }
+  const maxOrder = state.tasks.reduce((m, t) => Math.max(m, t.sort_order), 0);
+  const phaseColorMap = new Map();
+  let colorIdx = 0;
+  const rows = tasks.map((t, i) => {
+    const phaseName = (t.phase_name || "구분").trim() || "구분";
+    if (!phaseColorMap.has(phaseName)) {
+      phaseColorMap.set(phaseName, PALETTE[colorIdx % PALETTE.length]);
+      colorIdx++;
+    }
+    return {
+      project_id: state.project.id,
+      phase_name: phaseName,
+      phase_color: phaseColorMap.get(phaseName),
+      name: (t.name || "").trim(),
+      owner: (t.owner || "").trim(),
+      start_date: normalizeImportDate(t.start_date),
+      end_date: normalizeImportDate(t.end_date),
+      status: "todo",
+      sort_order: maxOrder + 1 + i
+    };
+  }).filter(r => r.name);
+
+  const { data, error } = await supabase.from("tasks").insert(rows).select();
+  if (error) { console.error(error); throw new Error("저장에 실패했습니다: " + error.message); }
+  state.tasks.push(...data);
+  renderAll();
 }
 
 wireFeedbackUI();
