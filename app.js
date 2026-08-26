@@ -358,6 +358,7 @@ function applyRemoteTaskChange(payload) {
   applyTaskFilters();
   renderStats();
   renderOwnerSummary();
+  renderPhaseSummary();
   renderLegend();
   renderGantt();
 }
@@ -421,6 +422,7 @@ function renderAll() {
   renderHeader();
   renderStats();
   renderOwnerSummary();
+  renderPhaseSummary();
   renderLegend();
   renderTable();
   renderGantt();
@@ -429,6 +431,7 @@ function renderAll() {
 function refreshTaskDerivedViews() {
   renderStats();
   renderOwnerSummary();
+  renderPhaseSummary();
   renderTable();
   renderGantt();
   renderCards();
@@ -523,6 +526,30 @@ function renderOwnerSummary() {
         <span class="owner-count doing">진행중 ${g.doing}</span>
         <span class="owner-count delayed">지연 ${g.delayed}</span>
         <span class="owner-count done">완료 ${g.done}</span>
+      </div>
+      <div class="owner-summary-bar"><div class="owner-summary-bar-fill" style="width:${donePct}%"></div></div>
+      <div class="owner-summary-pct">${donePct}%</div>
+    </div>`;
+  }).join("");
+}
+function renderPhaseSummary() {
+  const el = $("#phaseSummary");
+  if (el.hidden) return;
+  const groups = groupTasksByPhase(state.tasks);
+  if (!groups.length) { el.innerHTML = `<div class="owner-summary-empty">업무가 없습니다</div>`; return; }
+  el.innerHTML = groups.map(g => {
+    const c = { todo: 0, doing: 0, delayed: 0, done: 0 };
+    g.tasks.forEach(t => c[deriveTaskStatus(t).key]++);
+    const total = g.tasks.length;
+    const donePct = total ? Math.round(c.done / total * 100) : 0;
+    return `
+    <div class="owner-summary-row">
+      <div class="owner-summary-name">${escapeHtml(g.key || "구분")}</div>
+      <div class="owner-summary-counts">
+        <span class="owner-count todo" data-phase="${escapeHtml(g.key)}" data-status="todo">예정 ${c.todo}</span>
+        <span class="owner-count doing" data-phase="${escapeHtml(g.key)}" data-status="doing">진행중 ${c.doing}</span>
+        <span class="owner-count delayed" data-phase="${escapeHtml(g.key)}" data-status="delayed">지연 ${c.delayed}</span>
+        <span class="owner-count done" data-phase="${escapeHtml(g.key)}" data-status="done">완료 ${c.done}</span>
       </div>
       <div class="owner-summary-bar"><div class="owner-summary-bar-fill" style="width:${donePct}%"></div></div>
       <div class="owner-summary-pct">${donePct}%</div>
@@ -803,6 +830,43 @@ function openDependencyPicker(anchorEl, taskId) {
     if (!picker.contains(e.target) && e.target !== anchorEl) { picker.hidden = true; document.removeEventListener("click", closeOnOutside, true); }
   };
   setTimeout(() => document.addEventListener("click", closeOnOutside, true), 0);
+}
+const PHASE_STAT_LABEL = { todo: "예정", doing: "진행중", delayed: "지연", done: "완료" };
+function openPhaseStatusPopover(anchorEl, phaseKey, statusKey) {
+  const popover = $("#phaseStatPopover");
+  const matched = state.tasks.filter(t => phaseKeyOf(t.phase_name) === phaseKey && deriveTaskStatus(t).key === statusKey);
+  popover.innerHTML = `
+    <div class="dep-picker-phase-label">${escapeHtml(phaseKey || "구분")} · ${PHASE_STAT_LABEL[statusKey]} ${matched.length}건</div>
+    ${matched.length ? matched.map(t => `
+      <div class="dep-picker-item phase-stat-item" data-id="${t.id}">
+        <span>${escapeHtml(t.name || "(제목 없음)")}${t.owner ? ` · ${escapeHtml(t.owner)}` : ""}</span>
+      </div>
+    `).join("") : `<div class="dep-picker-empty">해당 업무가 없습니다</div>`}
+  `;
+  const rect = anchorEl.getBoundingClientRect();
+  popover.hidden = false;
+  const h = Math.min(popover.scrollHeight || 200, 320);
+  let top = rect.bottom + 6;
+  if (top + h > window.innerHeight) top = Math.max(8, rect.top - h - 6);
+  popover.style.top = top + "px";
+  popover.style.left = Math.min(rect.left, window.innerWidth - 260) + "px";
+  popover.querySelectorAll(".phase-stat-item").forEach(item => {
+    item.addEventListener("click", () => {
+      const id = item.dataset.id;
+      openDetailRows.add(id);
+      if (isPhaseCollapsed(phaseKey, "table")) togglePhase(phaseKey, "table");
+      else { renderTable(); applyTaskFilters(); }
+      popover.hidden = true;
+      requestAnimationFrame(() => {
+        const row = document.querySelector(`#taskTbody tr[data-id="${id}"]:not(.task-detail-row)`);
+        row?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    });
+  });
+  const closePopoverOnOutside = (e) => {
+    if (!popover.contains(e.target) && e.target !== anchorEl) { popover.hidden = true; document.removeEventListener("click", closePopoverOnOutside, true); }
+  };
+  setTimeout(() => document.addEventListener("click", closePopoverOnOutside, true), 0);
 }
 function autosizeTextarea(el) {
   el.style.height = "auto";
@@ -1326,6 +1390,14 @@ function wireStaticUI() {
   $("#ownerSummaryToggleBtn").addEventListener("click", () => {
     $("#ownerSummary").hidden = !$("#ownerSummary").hidden;
     renderOwnerSummary();
+  });
+  $("#phaseSummaryToggleBtn").addEventListener("click", () => {
+    $("#phaseSummary").hidden = !$("#phaseSummary").hidden;
+    renderPhaseSummary();
+  });
+  $("#phaseSummary").addEventListener("click", (e) => {
+    const chip = e.target.closest(".owner-count[data-phase]");
+    if (chip) openPhaseStatusPopover(chip, chip.dataset.phase, chip.dataset.status);
   });
   wireColumnResize();
 }
