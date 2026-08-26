@@ -137,6 +137,9 @@ function applyChecklistModeUI() {
   $("#viewNavToggleBtn").hidden = isChecklist;
   $("#todayFilterBtn").hidden = !isChecklist;
   $("#todayFilterBtnMobile").hidden = !isChecklist;
+  // PM(프로젝트 매니저)은 프로젝트 추진일정에만 해당하는 개념이라 체크리스트에서는 숨김
+  $("#pmInput").hidden = isChecklist;
+  $("#pmSep").hidden = isChecklist;
   if (isChecklist) {
     taskFilters.today = true;
     wireTodayFilter();
@@ -233,7 +236,7 @@ function buildProjectCardHtml(p) {
   <div class="project-card" data-id="${p.id}">
     <label class="pc-check"><input type="checkbox" class="pc-checkbox" data-id="${p.id}" ${selectedProjectIds.has(p.id) ? "checked" : ""}></label>
     <a class="pc-body" href="?p=${p.id}">
-      <div class="pc-eyebrow">${escapeHtml(p.org || "")}${p.dept ? " / " + escapeHtml(p.dept) : ""}${p.pm ? " / PM " + escapeHtml(p.pm) : ""}</div>
+      <div class="pc-eyebrow">${escapeHtml(p.org || "")}${p.dept ? " / " + escapeHtml(p.dept) : ""}${!isChecklist && p.pm ? " / PM " + escapeHtml(p.pm) : ""}</div>
       <div class="pc-name">${escapeHtml(p.name || "(제목 없음)")}${isChecklist ? "" : " 추진일정"}</div>
       <div class="pc-meta">생성일 ${p.created_at ? p.created_at.slice(0, 10) : ""} · <span class="proj-status-badge ${st.key}">${st.label}</span> · <span class="pc-mode ${p.mode === "edit" ? "edit" : ""}">${p.mode === "edit" ? "✏️ 편집 가능" : "🔒 보기 전용"}</span></div>
       <div class="pc-progress">
@@ -296,7 +299,7 @@ function wireLandingUI() {
   const createProject = async (type) => {
     const org = $("#newOrgInput").value.trim();
     const dept = $("#newDeptInput").value.trim();
-    const pm = $("#newPmInput").value.trim();
+    const pm = type === "checklist" ? "" : $("#newPmInput").value.trim();
     const name = $("#newNameInput").value.trim();
     if (!name) { $("#newNameInput").focus(); return; }
     const { data, error } = await supabase.from("projects").insert({ org, dept, pm, name, mode: "view", status: "todo", type }).select().single();
