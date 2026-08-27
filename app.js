@@ -171,6 +171,7 @@ function applyChecklistModeUI() {
   $("#viewNavToggleBtn").hidden = isChecklist;
   $("#todayFilterBtn").hidden = !isChecklist;
   $("#todayFilterBtnMobile").hidden = !isChecklist;
+  $("#titleSuffix").hidden = isChecklist;
   // PM(프로젝트 매니저)은 프로젝트 추진일정에만 해당하는 개념이라 체크리스트에서는 숨김
   $("#pmInput").hidden = isChecklist;
   $("#pmSep").hidden = isChecklist;
