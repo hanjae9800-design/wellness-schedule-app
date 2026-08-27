@@ -591,6 +591,7 @@ function renderHeader() {
   renderTeamChips();
   $("#teamChipRow").hidden = isChecklist;
   $("#teamAddBtn").hidden = isChecklist || disabled;
+  $("#checklistNoteBox").hidden = !(isChecklist && !disabled);
   const st = deriveProjectStatus(p.status || "todo", state.tasks);
   const badge = $("#statusBadge");
   badge.textContent = st.label;
@@ -1531,6 +1532,7 @@ function wireStaticUI() {
     $("#ownerSummary").hidden = !$("#ownerSummary").hidden;
     renderOwnerSummary();
   });
+  $("#checklistNoteAddBtn").addEventListener("click", startNoteImport);
   wireColumnResize();
 }
 
@@ -1643,6 +1645,34 @@ async function startFileImport(file) {
   } catch (e) {
     console.error(e);
     showImportStatus("가져오기 실패: " + (e.message || "알 수 없는 오류"), 5000);
+  }
+}
+
+async function startNoteImport() {
+  const input = $("#checklistNoteInput");
+  const note = (input.value || "").trim();
+  if (!note) return;
+  const btn = $("#checklistNoteAddBtn");
+  btn.disabled = true;
+  showImportStatus("AI가 메모를 분석하고 있습니다...");
+  try {
+    const res = await fetch("/api/parse-note", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ note })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "요청이 실패했습니다.");
+    const tasks = Array.isArray(data.tasks) ? data.tasks : [];
+    if (!tasks.length) { showImportStatus("메모에서 업무를 찾지 못했습니다.", 4000); return; }
+    await applyImportedTasks(tasks, "append");
+    input.value = "";
+    showImportStatus(`${tasks.length}개 업무를 추가했습니다.`, 3000);
+  } catch (e) {
+    console.error(e);
+    showImportStatus("추가 실패: " + (e.message || "알 수 없는 오류"), 5000);
+  } finally {
+    btn.disabled = false;
   }
 }
 
