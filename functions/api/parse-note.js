@@ -5,23 +5,21 @@ const GEMINI_MODEL = "gemini-3.6-flash";
 const MAX_NOTE_CHARS = 8000;
 
 function buildPrompt(todayStr) {
-  return `아래는 사용자가 개인 업무 체크리스트에 적으려고 쓴 자유 형식의 메모입니다. 이 메모를 분석해서 체크리스트에 추가할 개별 업무(할 일) 목록을 뽑아주세요.
+  return `아래는 사용자가 개인적으로 쓴 할 일 메모입니다. 이 메모에 나온 할 일을 하나도 빠짐없이 전부 뽑아주세요. "우유 사기", "세탁소 맡기기"처럼 아무리 사소하고 간단해 보이는 항목이라도 전부 포함해야 합니다 — 중요하거나 거창한 것만 고르지 마세요.
 
-오늘 날짜: ${todayStr}
-
-각 업무마다 다음 정보를 채워주세요:
-- phase_name: 이 업무가 속한 카테고리 이름. 메모에 자연스러운 구분이 보이면 그걸 쓰고, 없으면 "할 일"로 두세요.
+각 할 일마다 다음 정보를 채워주세요:
+- phase_name: 이 할 일이 속한 구분/카테고리 이름 (메모에 명시된 대분류가 있으면 그걸 쓰고, 없으면 "할 일"로 두세요)
 - name: 할 일 내용 (메모 표현을 다듬어 간결한 한 줄로)
-- start_date, end_date: "YYYY-MM-DD" 형식. 메모에 "내일", "이번주 금요일", "8월 30일"처럼 날짜/기한 표현이 있으면 위 오늘 날짜를 기준으로 계산해서 채우고, 마감일만 있으면 둘 다 그 날짜로, 날짜 정보가 전혀 없으면 둘 다 빈 문자열("")로 두세요.
+- start_date, end_date: "YYYY-MM-DD" 형식. 오늘 날짜는 ${todayStr}입니다. 메모에 "내일", "이번주 금요일"처럼 상대적인 날짜 표현이 있으면 오늘 날짜를 기준으로 계산해서 채우고, 날짜 정보가 전혀 없으면 빈 문자열("")로 두세요.
 
 메모에 나온 순서를 최대한 존중해서 나열해주세요.
 
 다음과 같은 정확한 JSON 형식으로만 답하세요 (다른 텍스트 없이 이 형식 그대로):
-{"tasks":[{"phase_name":"할 일","name":"세탁소 맡기기","start_date":"","end_date":""}]}
+{"tasks":[{"phase_name":"할 일","name":"우유 사기","start_date":"","end_date":""}]}
 
-할 일을 하나도 찾지 못했더라도 반드시 위 형식을 따르되 tasks 배열만 비워주세요: {"tasks":[]}
+찾은 할 일이 하나도 없더라도 반드시 위 형식을 따르되 tasks 배열만 비워주세요: {"tasks":[]}
 
-중요: 각 JSON 필드 값에는 오직 그 값 자체만 넣으세요. 추론 과정, 확인 문구, 주석 같은 것을 필드 값 안에 절대 섞지 마세요.`;
+중요: 각 JSON 필드 값에는 오직 그 값 자체만 넣으세요. 추론 과정, 확인 문구, 대안 검토, 주석 같은 것을 필드 값 안에 절대 섞지 마세요. 예를 들어 start_date 필드에는 "2026-01-05" 처럼 날짜만 들어가야 하고, "2026-01-05 (확인 필요)" 같은 식으로 다른 텍스트를 덧붙이면 안 됩니다.`;
 }
 
 export async function onRequestPost(context) {
@@ -47,7 +45,7 @@ export async function onRequestPost(context) {
   }
 
   const todayStr = new Date().toISOString().slice(0, 10);
-  const prompt = buildPrompt(todayStr) + "\n\n--- 메모 내용 ---\n" + note;
+  const parts = [{ text: buildPrompt(todayStr) }, { text: "\n\n--- 메모 내용 ---\n" + note }];
 
   let geminiRes;
   try {
@@ -57,7 +55,7 @@ export async function onRequestPost(context) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
+          contents: [{ parts }],
           generationConfig: {
             responseMimeType: "application/json"
           }
