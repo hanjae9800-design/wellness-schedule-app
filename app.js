@@ -1102,6 +1102,18 @@ function renderGantt() {
   wrap.innerHTML = buildGanttHtml(state.tasks, DAYPX, true, true);
   wireGanttResizer();
   wirePhaseToggles(wrap, "gantt");
+  syncGanttHeaderHeight(wrap);
+}
+
+// 오늘 표시선(.gantt-today-line)은 월/날짜 헤더 아래부터 시작하도록 top 값을 CSS 변수로 잡는데,
+// 헤더의 실제 높이(폰트/여백 조정 등으로 계속 바뀔 수 있음)를 하드코딩해두면 어긋나서 헤더와 첫 행
+// 사이 여백 틈으로 선이 살짝 삐져나와 보이는 문제가 있었음 — 렌더할 때마다 실측해서 맞춰준다.
+function syncGanttHeaderHeight(wrap) {
+  const monthRow = wrap.querySelector(".gantt-month-row");
+  const firstRow = wrap.querySelector(".gantt-row");
+  if (!monthRow || !firstRow) return;
+  const headerH = firstRow.getBoundingClientRect().top - monthRow.getBoundingClientRect().top;
+  if (headerH > 0) wrap.style.setProperty("--gantt-header-h", headerH + "px");
 }
 function loadGanttLabelWidth() {
   const v = parseInt(localStorage.getItem("ganttLabelWidth") || "", 10);
