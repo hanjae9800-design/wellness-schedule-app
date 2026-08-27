@@ -1,7 +1,7 @@
 // POST /api/parse-note
 // body: { note: "..." } (JSON)
-// Gemini API 키는 여기(서버)에서만 쓰고 브라우저에는 절대 내려주지 않습니다.
-const GEMINI_MODEL = "gemini-3.6-flash";
+// Cloudflare Workers AI(env.AI 바인딩)로 실행 — 별도 API 키 불필요, Cloudflare 계정 자체 무료 한도 사용.
+const AI_MODEL = "@cf/zai-org/glm-4.7-flash"; // 다국어(한국어 포함) 특화, 가볍고 빠른 모델
 const MAX_NOTE_CHARS = 8000;
 
 function buildPrompt(todayStr) {
@@ -24,9 +24,8 @@ function buildPrompt(todayStr) {
 
 export async function onRequestPost(context) {
   const { request, env } = context;
-  const apiKey = env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return json({ error: "서버에 GEMINI_API_KEY가 설정되어 있지 않습니다." }, 500);
+  if (!env.AI) {
+    return json({ error: "서버에 Workers AI 바인딩(AI)이 설정되어 있지 않습니다." }, 500);
   }
 
   let body;
@@ -45,48 +44,39 @@ export async function onRequestPost(context) {
   }
 
   const todayStr = new Date().toISOString().slice(0, 10);
-  const parts = [{ text: buildPrompt(todayStr) }, { text: "\n\n--- 메모 내용 ---\n" + note }];
+  const messages = [
+    { role: "system", content: buildPrompt(todayStr) },
+    { role: "user", content: "--- 메모 내용 ---\n" + note }
+  ];
 
-  let geminiRes;
+  let aiRes;
   try {
-    geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts }],
-          generationConfig: {
-            responseMimeType: "application/json"
-          }
-        })
-      }
-    );
+    aiRes = await env.AI.run(AI_MODEL, { messages });
   } catch (e) {
-    return json({ error: "AI 서버에 연결할 수 없습니다." }, 502);
+    return json({ error: "AI 분석 요청이 실패했습니다.", detail: String(e && e.message || e).slice(0, 500) }, 502);
   }
 
-  if (!geminiRes.ok) {
-    const errText = await geminiRes.text().catch(() => "");
-    return json({ error: "AI 분석 요청이 실패했습니다.", detail: errText.slice(0, 500) }, 502);
-  }
-
-  const data = await geminiRes.json();
-  const candidateParts = (data && data.candidates && data.candidates[0] && data.candidates[0].content
-    && data.candidates[0].content.parts) || [];
-  // 최신 Gemini 모델은 "생각하는 과정"(thought: true)과 최종 답변을 parts 배열에 나눠서 보내므로,
-  // thought가 아닌 실제 답변 조각을 찾아서 써야 함.
-  const answerPart = candidateParts.find(p => !p.thought && typeof p.text === "string");
-  const rawText = answerPart && answerPart.text;
+  // 모델/버전에 따라 응답 형태가 다를 수 있어(OpenAI 호환 chat completion 형식이 기본이지만
+  // 예전 Workers AI 형식과도 호환되게) 여러 경로를 시도해서 텍스트를 뽑는다.
+  const rawText =
+    (aiRes && aiRes.choices && aiRes.choices[0] && aiRes.choices[0].message && aiRes.choices[0].message.content) ||
+    (aiRes && aiRes.response) ||
+    (typeof aiRes === "string" ? aiRes : "");
   if (!rawText) {
     return json({ error: "AI 응답을 읽을 수 없습니다." }, 502);
   }
 
+  // 모델이 JSON 앞뒤로 ```json 코드펜스나 설명을 덧붙이는 경우를 방어적으로 처리.
+  const cleaned = rawText.replace(/```json|```/g, "").trim();
+  const jsonStart = cleaned.indexOf("{");
+  const jsonEnd = cleaned.lastIndexOf("}");
+  const jsonSlice = jsonStart >= 0 && jsonEnd > jsonStart ? cleaned.slice(jsonStart, jsonEnd + 1) : cleaned;
+
   let parsed;
   try {
-    parsed = JSON.parse(rawText);
+    parsed = JSON.parse(jsonSlice);
   } catch (e) {
-    return json({ error: "AI 응답이 올바른 형식이 아닙니다." }, 502);
+    return json({ error: "AI 응답이 올바른 형식이 아닙니다.", detail: rawText.slice(0, 500) }, 502);
   }
 
   const tasks = Array.isArray(parsed.tasks) ? parsed.tasks : [];

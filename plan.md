@@ -1,48 +1,41 @@
-# 새 프로젝트 만들기 — 팝업 방식으로 전환
+# 메모→할일 AI 변환 기능을 Gemini → Cloudflare Workers AI로 전환
 
 ## 요청 내용
-- "새 프로젝트 만들기" 버튼을 프로젝트 카드 목록(`#projectList`) 바로 위, 우측에 붙인다.
-- 버튼을 누르면 팝업(모달)이 뜨고, 그 안에 다음 입력칸들을 보여준다:
-  - 상위 사업명
-  - 부서명
-  - PM
-  - 팀원 추가 입력칸
-  - 프로젝트명
+- 현재 "업무 체크리스트"의 메모→할일 자동 변환 기능([functions/api/parse-note.js](functions/api/parse-note.js))이 Google Gemini API를 쓰고 있는데, 무료 한도가 너무 적음.
+- Cloudflare Workers AI(Pages Functions에 내장된 `env.AI` 바인딩, Cloudflare 자체 인프라에서 오픈소스 모델 실행)로 교체.
 
 ## 현재 상태
-- 랜딩 페이지 맨 아래 `.new-project-box`에 org/dept/pm/name 입력칸 4개 + "새 프로젝트 만들기" 버튼이 나란히 있음 (체크리스트 만들기 버튼은 지난 작업에서 이미 제거됨).
-- "팀원"은 지금까지 프로젝트 생성 시점엔 입력받지 않고, 프로젝트 상세 페이지에 들어간 뒤 상단의 "+ 팀원 추가" 버튼(`teamAddBtn`)을 눌러 `prompt()`로 한 명씩 추가하는 방식. `team_members`는 projects 테이블의 콤마 구분 텍스트 컬럼.
-- 모달 UI 패턴은 이미 `.feedback-modal` / `.feedback-modal-box` 클래스로 "불편사항 제보"와 "업무 가져오기(파일 import)" 두 곳에서 쓰이고 있음 — 새 모달도 이 스타일을 재사용.
+- `parse-note.js`가 `fetch("https://generativelanguage.googleapis.com/...")`로 Gemini를 호출, `env.GEMINI_API_KEY`(Cloudflare Pages 환경변수)를 서버에서만 사용.
+- `responseMimeType: "application/json"` 옵션으로 Gemini가 JSON만 반환하도록 강제하고 있음.
+- 이 프로젝트는 `wrangler.toml` 없이 `wrangler pages deploy .`로 배포하는 Direct Upload 방식 (Git 연동 아님).
 
 ## 변경 계획
 
-### 1. 버튼 위치 이동
-- 랜딩 페이지 맨 아래의 `.new-project-box` 전체(입력칸 4개 + 버튼)를 제거.
-- `<h2 class="landing-section-title">프로젝트</h2>` 줄을 헤더 형태로 바꿔서, 제목은 왼쪽 + "+ 새 프로젝트" 버튼은 오른쪽에 배치하는 한 줄짜리 flex row로 변경 (`#projectList` 바로 위).
+### 1. Cloudflare AI 바인딩 추가
+- 프로젝트 루트에 `wrangler.toml` 신규 생성:
+  ```toml
+  pages_build_output_dir = "."
+  [ai]
+  binding = "AI"
+  ```
+- (참고: wrangler.toml이 생기면 이후 배포 명령이 `wrangler pages deploy .`로 그대로 동작하되, 이 설정 파일의 바인딩을 인식함. 별도로 Cloudflare 대시보드에서 켤 필요는 없어짐.)
 
-### 2. 새 모달 추가
-- `#newProjectModal` (`.feedback-modal` 재사용)에:
-  - 상위 사업명 입력칸
-  - 부서명 입력칸
-  - PM 입력칸
-  - 팀원 추가: 입력칸 + "추가" 버튼 → 누르면 아래에 칩(chip)으로 쌓임, 칩 클릭/✕로 삭제 가능 (프로젝트 상세 페이지의 팀 칩 UI와 비슷한 느낌으로, 다만 여기서는 `prompt()` 대신 모달 안 입력칸에 실제로 렌더링)
-  - 프로젝트명 입력칸
-  - 취소 / 만들기 버튼
+### 2. `parse-note.js` 로직 교체
+- Gemini `fetch` 호출부를 `await env.AI.run(model, {...})` 호출로 교체.
+- 모델 후보 (한재님 선택 필요, 아래 "확인 필요" 참고):
+  - `@cf/meta/llama-3.3-70b-instruct-fp8-fast` — 크고 성능 좋음, function calling 지원
+  - `@cf/zhipu-ai/glm-4.7-flash` (가칭, 정확한 id는 구현 시 재확인) — 100개 이상 언어 멀티링구얼 특화, 더 빠르고 저렴
+- 프롬프트(`buildPrompt`)는 그대로 재사용 — 지시문 자체는 모델에 안 묶여 있음.
+- JSON 모드/응답 파싱: Gemini의 `responseMimeType: json`처럼 강제 JSON 응답이 안 될 수 있어서, 응답에서 코드펜스(````json ... ````) 제거 등 방어적 파싱 로직 추가.
+- 에러 메시지 문구("AI 분석 요청이 실패했습니다" 등)는 그대로 유지.
+- `GEMINI_API_KEY` 관련 코드/문구는 제거 (Cloudflare Pages 환경변수에 등록된 `GEMINI_API_KEY` 자체는 한재님이 나중에 대시보드에서 지우셔도 되고 안 지우셔도 무방 — 코드에서 더는 안 씀).
 
-### 3. JS 로직
-- 모달 열기: "+ 새 프로젝트" 버튼 클릭 시 입력칸/팀원 칩 목록 초기화 후 모달 표시.
-- 팀원 추가: 입력칸에 이름 쓰고 Enter 또는 "추가" 버튼 → 칩 목록에 추가(중복 방지), 입력칸 비움.
-- 칩 삭제: 각 칩의 ✕ 클릭 시 목록에서 제거.
-- 만들기: 프로젝트명 필수 검증(비어있으면 포커스만 이동) → `team_members`를 칩 목록을 `", "`로 join한 문자열로 만들어서 기존과 동일하게 `projects` 테이블에 insert (`type: "timeline"`) → 생성된 프로젝트로 이동.
-- 취소: 모달만 닫힘, 입력값은 버려짐.
-
-### 4. 스타일
-- 모달 안 입력칸들은 세로로 나열 (`.feedback-modal-box`에 있는 여백 스타일 재사용), 팀원 칩 줄은 프로젝트 상세 페이지의 `.team-chip` 스타일 재사용.
-- "+ 새 프로젝트" 버튼은 상단바의 다른 pill 버튼들과 톤을 맞춘 secondary 버튼 스타일.
-
-### 5. 영향 범위
-- 업무 체크리스트 생성 플로우는 이미 버튼이 제거된 상태라 이번 작업과 무관 — 손대지 않음.
-- 기존 프로젝트 상세 페이지의 "+ 팀원 추가"(`teamAddBtn`, `prompt()` 방식)는 그대로 유지 — 이번 변경은 "생성 시점"의 팀원 추가 UI만 새로 만드는 것.
+### 3. 배포/검증
+- `wrangler pages deploy .` (AI 바인딩 포함해서 재배포 — Direct Upload에 wrangler.toml이 있으면 자동 인식됨)
+- Playwright로 실제 메모 입력 → 할일 자동 추가까지 end-to-end 테스트 (안전한 테스트 프로젝트로).
 
 ## 확인이 필요한 부분
+- **모델 선택**: 한국어 품질 우선(`llama-3.3-70b-instruct-fp8-fast`, 크고 느림) vs 속도/비용 우선(`glm-4.7-flash`, 빠르고 저렴) — 구현 전에 실제 호출로 한국어 메모 몇 개 테스트해보고 한재님과 같이 고를지, 제가 먼저 골라서 구현할지?
+- **정확한 API 파라미터 형식**: Workers AI 모델마다 `messages` 배열 형식, JSON 모드 지원 여부가 조금씩 다릅니다 — 이건 실제 호출 테스트로 확인 후 구현하겠습니다 (추측으로 짜지 않음).
+- **무료 한도**: Workers AI 무료 티어는 일일 뉴런(Neurons) 단위 한도가 있습니다 (Gemini보다 넉넉하지만 무제한은 아님) — 참고만 해주세요.
 - (한재님 코멘트 남겨주세요)
