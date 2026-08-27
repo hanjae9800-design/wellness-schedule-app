@@ -578,6 +578,7 @@ function refreshTaskDerivedViews() {
 function renderHeader() {
   const p = state.project;
   if (!p) return;
+  const isChecklist = p.type === "checklist";
   $("#orgInput").value = p.org || "";
   $("#deptInput").value = p.dept || "";
   $("#pmInput").value = p.pm || "";
@@ -588,7 +589,8 @@ function renderHeader() {
   $("#pmInput").disabled = disabled;
   $("#projNameInput").disabled = disabled;
   renderTeamChips();
-  $("#teamAddBtn").hidden = disabled;
+  $("#teamChipRow").hidden = isChecklist;
+  $("#teamAddBtn").hidden = isChecklist || disabled;
   const st = deriveProjectStatus(p.status || "todo", state.tasks);
   const badge = $("#statusBadge");
   badge.textContent = st.label;
