@@ -1,7 +1,9 @@
 // POST /api/parse-note
 // body: { note: "..." } (JSON)
 // Cloudflare Workers AI(env.AI 바인딩)로 실행 — 별도 API 키 불필요, Cloudflare 계정 자체 무료 한도 사용.
-const AI_MODEL = "@cf/zai-org/glm-4.7-flash"; // 다국어(한국어 포함) 특화, 가볍고 빠른 모델
+// glm-4.7-flash(추론형)로 먼저 시도했으나 응답에 "생각하는 과정"이 포함되어 30~50초씩 걸려서
+// 실사용에 부적합 — 추론 없이 바로 답하는 경량 모델로 교체 (실측 약 1.6초).
+const AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fast";
 const MAX_NOTE_CHARS = 8000;
 
 function buildPrompt(todayStr) {
@@ -80,7 +82,9 @@ export async function onRequestPost(context) {
   }
 
   const tasks = Array.isArray(parsed.tasks) ? parsed.tasks : [];
-  return json({ tasks });
+  // 문제 발생 시 원인 파악용 — 요청 헤더에 X-Debug: 1을 줄 때만 원문 응답을 함께 내려줌 (평소엔 응답에 안 실림).
+  const debug = request.headers.get("X-Debug") === "1" ? { rawText: rawText.slice(0, 2000) } : undefined;
+  return json({ tasks, debug });
 }
 
 function json(obj, status) {
