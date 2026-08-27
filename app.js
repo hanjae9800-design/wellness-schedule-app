@@ -1103,6 +1103,7 @@ function renderGantt() {
   wireGanttResizer();
   wirePhaseToggles(wrap, "gantt");
   syncGanttHeaderHeight(wrap);
+  syncGanttLabelCurtain();
 }
 
 // 오늘 표시선(.gantt-today-line)은 월/날짜 헤더 아래부터 시작하도록 top 값을 CSS 변수로 잡는데,
@@ -1114,6 +1115,18 @@ function syncGanttHeaderHeight(wrap) {
   if (!monthRow || !firstRow) return;
   const headerH = firstRow.getBoundingClientRect().top - monthRow.getBoundingClientRect().top;
   if (headerH > 0) wrap.style.setProperty("--gantt-header-h", headerH + "px");
+}
+
+// 오늘선/월 경계선이 행과 행 사이 미세한 틈으로 삐져나오는 것을 막기 위해, 라벨 폭만큼 통짜
+// 배경(.gantt-label-curtain)을 깔아둔다. 이 배경도 .gantt-today-line처럼 position:absolute라서
+// (grid 레이아웃에 별도 행을 만들지 않고, top:0;bottom:0으로 전체 높이를 정확히 채움) 안전하지만,
+// absolute는 스크롤 콘텐츠 기준으로 움직이기 때문에 sticky 라벨처럼 화면에 고정해서 보이게 하려면
+// 가로 스크롤할 때마다 left 값을 스크롤 위치만큼 직접 맞춰줘야 한다 — 그래서 스크롤 이벤트로 동기화.
+function syncGanttLabelCurtain() {
+  const scrollWrap = $("#ganttWrap");
+  const curtain = document.querySelector("#gantt .gantt-label-curtain");
+  if (!scrollWrap || !curtain) return;
+  curtain.style.left = scrollWrap.scrollLeft + "px";
 }
 function loadGanttLabelWidth() {
   const v = parseInt(localStorage.getItem("ganttLabelWidth") || "", 10);
@@ -1271,6 +1284,12 @@ function buildGanttHtml(tasks, daypx, grouped = true, extendRange = false) {
     const todayLabelDate = new Date(today);
     html += `<div class="gantt-today-line" style="left:${todayLeft}px"><span class="gantt-today-label">오늘 (${todayLabelDate.getMonth() + 1}/${todayLabelDate.getDate()})</span></div>`;
   }
+
+  // 오늘선/월 경계선은 각 행의 고정(sticky) 라벨 배경으로 가려지는 구조라, 행과 행 사이의
+  // 미세한 픽셀 틈(테두리 렌더링, 구분 그룹 헤더의 height:auto 등)에서 살짝 삐져나와 보일 수 있음.
+  // 행 하나하나가 완벽히 맞물리길 기대하는 대신, 라벨 폭만큼 통짜 배경 하나를 두 선보다 뒤(DOM 순서상)에
+  // 깔아서 그 틈까지 통째로 가린다 (실제 라벨 내용은 z-index가 더 높아서 이 배경 위에 그대로 보임).
+  html += `<div class="gantt-label-curtain" style="width:${ganttLabelWidth}px"></div>`;
   return html;
 }
 
@@ -1481,6 +1500,9 @@ function wireViewNav() {
 
 // ---------- mobile gantt overlay ----------
 function wireStaticUI() {
+  const ganttScrollWrap = $("#ganttWrap");
+  if (ganttScrollWrap) ganttScrollWrap.addEventListener("scroll", syncGanttLabelCurtain, { passive: true });
+
   document.addEventListener("pointermove", (e) => {
     if (!dragTracking) return;
     if (!dragTracking.dragging) {

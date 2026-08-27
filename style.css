@@ -298,6 +298,7 @@ select.task-status-badge:disabled { cursor: default; opacity: .85; }
 .gantt-month-track span { flex: none; padding: 2px 0 2px 6px; box-sizing: border-box; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-right: 1px dashed var(--border); }
 .gantt-month-track span.alt { background: var(--surface-alt); }
 .gantt-month-line { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--border-strong); z-index: 1; pointer-events: none; }
+.gantt-label-curtain { position: absolute; top: 0; bottom: 0; left: 0; background: var(--surface-alt); z-index: 1; pointer-events: none; }
 .gantt-ruler { display: flex; font-size: 10.5px; color: var(--ink-muted); border-bottom: 1px solid var(--border-strong); padding-bottom: 6px; margin-bottom: 4px; }
 .gantt-ruler-track { display: flex; flex: none; }
 .gantt-ruler-daily .gantt-ruler-track span { font-size: 9px; text-align: center; }
