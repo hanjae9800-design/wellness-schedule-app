@@ -874,7 +874,7 @@ function buildTaskRowHtml(t, dis) {
   return `
     <tr data-id="${t.id}">
       <td class="col-drag"><span class="drag-handle">⠿</span></td>
-      <td class="col-name"><input value="${escapeHtml(t.name)}" data-field="name" data-id="${t.id}" ${dis} placeholder="업무명">${subtasks.length ? `<span class="task-subtask-badge">${subtasks.filter(s => s.done).length}/${subtasks.length}</span>` : ""}</td>
+      <td class="col-name">${isChecklist ? `<button type="button" class="task-subtask-caret-btn ${subOpen ? "open" : ""}" data-action="subtask-toggle" data-id="${t.id}" aria-label="세부업무 펼치기"><span class="task-subtask-caret">▾</span></button>` : ""}<input value="${escapeHtml(t.name)}" data-field="name" data-id="${t.id}" ${dis} placeholder="업무명">${subtasks.length ? `<span class="task-subtask-badge">${subtasks.filter(s => s.done).length}/${subtasks.length}</span>` : ""}</td>
       <td class="col-taskstatus">${buildTaskStatusSelectHtml(t, ts, dis)}</td>
       <td class="col-detail"><button type="button" class="detail-btn ${open ? "open" : ""}" data-action="detail" data-id="${t.id}"><span class="detail-car">▾</span> 세부내용</button></td>
       <td class="col-del">${state.editMode ? `<button class="del-btn" data-action="del" data-id="${t.id}">✕</button>` : ""}</td>
@@ -1131,8 +1131,10 @@ function toggleSubtaskRow(id) {
   else openSubtaskRows.add(id);
   const tbody = $("#taskTbody");
   if (!tbody) return;
+  const caretBtn = tbody.querySelector(`[data-action="subtask-toggle"][data-id="${id}"]`);
   const subTr = tbody.querySelector(`tr.task-subtask-row[data-id="${id}"]`);
   const isOpen = openSubtaskRows.has(id);
+  if (caretBtn) caretBtn.classList.toggle("open", isOpen);
   if (subTr) {
     subTr.hidden = !isOpen;
     if (isOpen) subTr.querySelector(".subtask-add-input")?.focus();
@@ -1149,6 +1151,10 @@ function wireTaskRowEl(tr) {
   if (!tr.hidden) tr.querySelectorAll("textarea.autosize-textarea").forEach(autosizeTextarea);
   tr.querySelectorAll('[data-action="del"]').forEach(el => el.addEventListener("click", () => deleteTask(el.dataset.id)));
   tr.querySelectorAll('[data-action="detail"]').forEach(el => el.addEventListener("click", () => toggleTaskDetail(el.dataset.id)));
+  tr.querySelectorAll('[data-action="subtask-toggle"]').forEach(el => el.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleSubtaskRow(el.dataset.id);
+  }));
   wireDependencyField(tr);
   wireSubtaskSection(tr);
 }
@@ -1212,12 +1218,11 @@ function wireDragReorder(tbody) {
   const isChecklist = state.project && state.project.type === "checklist";
   tbody.querySelectorAll("tr[data-id]:not(.task-detail-row):not(.task-subtask-row)").forEach(row => {
     row.addEventListener("pointerdown", (e) => {
-      if (e.target.matches('input[data-field="name"]')) return;
+      if (e.target.matches('input[data-field="name"]') || e.target.closest('.task-subtask-caret-btn')) return;
       if (e.button !== 0) return;
       const detailEl = tbody.querySelector(`tr.task-detail-row[data-id="${row.dataset.id}"]`);
       const subtaskEl = isChecklist ? tbody.querySelector(`tr.task-subtask-row[data-id="${row.dataset.id}"]`) : null;
-      const toggleExcluded = !!e.target.closest('input, select, textarea, button, .drag-handle');
-      dragTracking = { row, detailEl, subtaskEl, startX: e.clientX, startY: e.clientY, dragging: false, toggleExcluded };
+      dragTracking = { row, detailEl, subtaskEl, startX: e.clientX, startY: e.clientY, dragging: false };
     });
   });
 }
@@ -1656,8 +1661,6 @@ function wireStaticUI() {
       const ids = Array.from(tbody.querySelectorAll("tr[data-id]:not(.task-detail-row):not(.task-subtask-row)")).map(r => r.dataset.id);
       state.tasks.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
       persistOrder();
-    } else if (dragTracking.subtaskEl && !dragTracking.toggleExcluded) {
-      toggleSubtaskRow(dragTracking.row.dataset.id);
     }
     dragTracking = null;
   });
