@@ -878,6 +878,7 @@ function buildTaskRowHtml(t, dis) {
   `;
 }
 function buildTaskDetailRowHtml(t, dis, open) {
+  const isChecklist = state.project && state.project.type === "checklist";
   return `<tr class="task-detail-row" data-id="${t.id}" ${open ? "" : "hidden"}>
     <td colspan="5">
       <div class="task-detail-inner">
@@ -887,6 +888,7 @@ function buildTaskDetailRowHtml(t, dis, open) {
         <div class="task-detail-field"><label>선행업무</label>${buildDependencyFieldHtml(t)}</div>
         <div class="task-detail-field"><label>비고</label><textarea class="autosize-textarea" rows="1" data-field="note" data-id="${t.id}" ${dis} placeholder="-">${escapeHtml(t.note)}</textarea></div>
       </div>
+      ${isChecklist ? buildSubtaskSectionHtml(t) : ""}
     </td>
   </tr>`;
 }
@@ -928,6 +930,96 @@ function refreshDependencyField(taskId) {
   row.outerHTML = buildDependencyFieldHtml(t);
   const newRow = document.querySelector(`.dep-chip-row[data-id="${taskId}"]`);
   if (newRow) wireDependencyField(newRow.parentElement);
+}
+// ---------- 세부업무 (체크리스트 전용) ----------
+function parseSubtasks(raw) {
+  if (!raw) return [];
+  try {
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.filter(s => s && typeof s.id === "string" && typeof s.name === "string") : [];
+  } catch (e) { return []; }
+}
+function buildSubtaskSectionHtml(t) {
+  const list = parseSubtasks(t.subtasks);
+  const dis = !state.editMode;
+  const doneCount = list.filter(s => s.done).length;
+  const itemsHtml = list.map(s => `
+    <div class="subtask-row" data-sub-id="${s.id}">
+      <input type="checkbox" class="subtask-check" data-id="${t.id}" data-sub-id="${s.id}" ${s.done ? "checked" : ""} ${dis ? "disabled" : ""}>
+      <input type="text" class="subtask-name-input${s.done ? " done" : ""}" value="${escapeHtml(s.name)}" data-id="${t.id}" data-sub-id="${s.id}" ${dis ? "disabled" : ""}>
+      ${!dis ? `<button type="button" class="subtask-del-btn" data-id="${t.id}" data-sub-id="${s.id}" aria-label="삭제">✕</button>` : ""}
+    </div>`).join("");
+  const emptyHtml = !list.length ? `<div class="subtask-empty">세부 업무가 없습니다</div>` : "";
+  const addHtml = !dis ? `
+    <div class="subtask-add-row">
+      <input type="text" class="subtask-add-input" data-id="${t.id}" placeholder="세부 업무 추가 후 Enter">
+    </div>` : "";
+  return `
+    <div class="subtask-section" data-id="${t.id}">
+      <div class="subtask-section-head">세부 업무${list.length ? ` <span class="subtask-count">${doneCount}/${list.length}</span>` : ""}</div>
+      ${itemsHtml}${emptyHtml}${addHtml}
+    </div>`;
+}
+function wireSubtaskSection(root) {
+  root.querySelectorAll(".subtask-check").forEach(cb => {
+    cb.addEventListener("change", () => toggleSubtask(cb.dataset.id, cb.dataset.subId));
+  });
+  root.querySelectorAll(".subtask-name-input").forEach(inp => {
+    inp.addEventListener("change", () => renameSubtask(inp.dataset.id, inp.dataset.subId, inp.value));
+  });
+  root.querySelectorAll(".subtask-del-btn").forEach(btn => {
+    btn.addEventListener("click", () => deleteSubtask(btn.dataset.id, btn.dataset.subId));
+  });
+  root.querySelectorAll(".subtask-add-input").forEach(inp => {
+    inp.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      const name = inp.value.trim();
+      if (!name) return;
+      addSubtask(inp.dataset.id, name);
+    });
+  });
+}
+function refreshSubtaskSection(taskId) {
+  const t = state.tasks.find(x => x.id === taskId);
+  const el = document.querySelector(`.subtask-section[data-id="${taskId}"]`);
+  if (!t || !el) return;
+  el.outerHTML = buildSubtaskSectionHtml(t);
+  const newEl = document.querySelector(`.subtask-section[data-id="${taskId}"]`);
+  if (newEl) wireSubtaskSection(newEl);
+}
+function addSubtask(taskId, name) {
+  const t = state.tasks.find(x => x.id === taskId);
+  if (!t) return;
+  const list = parseSubtasks(t.subtasks);
+  list.push({ id: crypto.randomUUID(), name, done: false });
+  updateTaskField(taskId, "subtasks", JSON.stringify(list));
+  refreshSubtaskSection(taskId);
+}
+function toggleSubtask(taskId, subId) {
+  const t = state.tasks.find(x => x.id === taskId);
+  if (!t) return;
+  const list = parseSubtasks(t.subtasks);
+  const s = list.find(x => x.id === subId);
+  if (!s) return;
+  s.done = !s.done;
+  updateTaskField(taskId, "subtasks", JSON.stringify(list));
+  refreshSubtaskSection(taskId);
+}
+function renameSubtask(taskId, subId, name) {
+  const t = state.tasks.find(x => x.id === taskId);
+  if (!t) return;
+  const list = parseSubtasks(t.subtasks);
+  const s = list.find(x => x.id === subId);
+  if (!s) return;
+  s.name = name.trim();
+  updateTaskField(taskId, "subtasks", JSON.stringify(list));
+}
+function deleteSubtask(taskId, subId) {
+  const t = state.tasks.find(x => x.id === taskId);
+  if (!t) return;
+  const list = parseSubtasks(t.subtasks).filter(x => x.id !== subId);
+  updateTaskField(taskId, "subtasks", JSON.stringify(list));
+  refreshSubtaskSection(taskId);
 }
 function openDependencyPicker(anchorEl, taskId) {
   const picker = $("#depPicker");
@@ -1026,7 +1118,7 @@ function toggleTaskDetail(id) {
   }
 }
 function wireTaskRowEl(tr) {
-  tr.querySelectorAll("input,select,textarea").forEach(el => {
+  tr.querySelectorAll("input[data-field],select[data-field],textarea[data-field]").forEach(el => {
     el.addEventListener("change", () => {
       updateTaskField(el.dataset.id, el.dataset.field, el.value);
       if (["status", "start_date", "end_date", "phase_name"].includes(el.dataset.field)) refreshTaskDerivedViews();
@@ -1037,6 +1129,7 @@ function wireTaskRowEl(tr) {
   tr.querySelectorAll('[data-action="del"]').forEach(el => el.addEventListener("click", () => deleteTask(el.dataset.id)));
   tr.querySelectorAll('[data-action="detail"]').forEach(el => el.addEventListener("click", () => toggleTaskDetail(el.dataset.id)));
   wireDependencyField(tr);
+  wireSubtaskSection(tr);
 }
 function patchTaskRow(taskId) {
   const t = state.tasks.find(x => x.id === taskId);
