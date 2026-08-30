@@ -1293,6 +1293,7 @@ function renderGantt() {
   wireGanttResizer();
   wirePhaseToggles(wrap, "gantt");
   syncGanttLabelCurtain();
+  syncGanttYearLabels();
 }
 
 // 오늘 열/월 경계선이 행과 행 사이 미세한 틈으로 삐져나오는 것을 막기 위해, 라벨 폭만큼 통짜
@@ -1305,6 +1306,24 @@ function syncGanttLabelCurtain() {
   const curtain = document.querySelector("#gantt .gantt-label-curtain");
   if (!scrollWrap || !curtain) return;
   curtain.style.left = scrollWrap.scrollLeft + "px";
+}
+// 연도 라벨("2026년")을 각자 자기 구간 안에서만 스크롤에 맞춰 왼쪽으로 따라오게 함 — 구간이
+// 여러 달에 걸쳐 넓을 때도 항상 화면에 보이도록. 구간 경계를 넘어가면 그 구간의 오른쪽 끝에서 멈춤.
+function syncGanttYearLabels() {
+  const scrollWrap = $("#ganttWrap");
+  if (!scrollWrap) return;
+  const scrollLeft = scrollWrap.scrollLeft;
+  document.querySelectorAll("#gantt .gantt-year-seg").forEach(seg => {
+    const label = seg.querySelector(".gantt-year-label");
+    if (!label) return;
+    const segStart = parseFloat(seg.dataset.start);
+    const segWidth = parseFloat(seg.dataset.width);
+    const labelWidth = label.offsetWidth;
+    // 라벨이 있어야 할 콘텐츠 기준 x좌표 = 스크롤 위치 + 라벨열 폭(커튼이 끝나는 지점) — 거기서
+    // 이 구간 자신의 시작점(segStart)을 빼면 구간 안에서 얼마나 오른쪽으로 밀어야 하는지 나옴.
+    const offset = Math.max(0, Math.min((scrollLeft + ganttLabelWidth) - segStart, segWidth - labelWidth));
+    label.style.left = Math.max(0, offset) + "px";
+  });
 }
 function loadGanttLabelWidth() {
   const v = parseInt(localStorage.getItem("ganttLabelWidth") || "", 10);
@@ -1366,7 +1385,24 @@ function buildGanttMonthSegments(minDate, totalDays) {
     const monthLastDay = new Date(y, m + 1, 0);
     const segEnd = monthLastDay < rangeEnd ? monthLastDay : rangeEnd;
     const lengthDays = daysBetween(cur, segEnd) + 1;
-    segments.push({ label: `${y}년 ${m + 1}월`, days: lengthDays });
+    segments.push({ label: `${m + 1}월`, days: lengthDays });
+    cur = new Date(segEnd);
+    cur.setDate(cur.getDate() + 1);
+  }
+  return segments;
+}
+// 월 눈금 위에 별도로 얹는 연도 눈금 — 같은 해가 이어지는 구간을 하나로 묶어서 "2026년"처럼 한 번만 표시.
+function buildGanttYearSegments(minDate, totalDays) {
+  const segments = [];
+  let cur = new Date(minDate);
+  const rangeEnd = new Date(minDate);
+  rangeEnd.setDate(rangeEnd.getDate() + totalDays - 1);
+  while (cur <= rangeEnd) {
+    const y = cur.getFullYear();
+    const yearLastDay = new Date(y, 11, 31);
+    const segEnd = yearLastDay < rangeEnd ? yearLastDay : rangeEnd;
+    const lengthDays = daysBetween(cur, segEnd) + 1;
+    segments.push({ label: `${y}년`, days: lengthDays });
     cur = new Date(segEnd);
     cur.setDate(cur.getDate() + 1);
   }
@@ -1420,10 +1456,26 @@ function buildGanttHtml(tasks, daypx, grouped = true, extendRange = false) {
   const rowWidth = ganttLabelWidth + trackWidth;
 
   const monthSegments = buildGanttMonthSegments(minDate, totalDays);
-  let html = `<div class="gantt-month-row" style="width:${rowWidth}px">
+  const yearSegments = buildGanttYearSegments(minDate, totalDays);
+  // 연도 구간이 몇 달씩 이어지면 라벨을 구간 가운데 딱 한 번만 찍어서는 스크롤 안 하면 안 보이므로,
+  // 구간 자체는 그대로 두고 안쪽 라벨만 스크롤에 맞춰 좌우로 따라오게 함(엑셀 틀고정과 비슷한 느낌).
+  // CSS sticky로 시도했으나 이 flex 트랙 구조에서는 안 붙어서(원인 불명) 스크롤 이벤트로 직접 계산.
+  let yearCursor = 0;
+  let html = `<div class="gantt-year-row" style="width:${rowWidth}px">
+    <div class="gantt-spacer" style="width:${ganttLabelWidth}px"></div>
+    <div class="gantt-year-track" style="width:${trackWidth}px">
+      ${yearSegments.map(s => {
+        const segWidth = s.days * daypx;
+        const seg = `<span class="gantt-year-seg" style="width:${segWidth}px" data-start="${yearCursor}" data-width="${segWidth}"><span class="gantt-year-label">${s.label}</span></span>`;
+        yearCursor += segWidth;
+        return seg;
+      }).join("")}
+    </div>
+  </div>`;
+  html += `<div class="gantt-month-row" style="width:${rowWidth}px">
     <div class="gantt-spacer" style="width:${ganttLabelWidth}px"><div class="gantt-resizer" id="ganttResizer" title="드래그해서 업무명 폭 조정"></div></div>
     <div class="gantt-month-track" style="width:${trackWidth}px">
-      ${monthSegments.map((s, i) => `<span class="${i % 2 === 1 ? "alt" : ""}" style="width:${s.days * daypx}px">${s.label}</span>`).join("")}
+      ${monthSegments.map(s => `<span style="width:${s.days * daypx}px">${s.label}</span>`).join("")}
     </div>
   </div>`;
 
@@ -1703,7 +1755,7 @@ function wireViewNav() {
 // ---------- mobile gantt overlay ----------
 function wireStaticUI() {
   const ganttScrollWrap = $("#ganttWrap");
-  if (ganttScrollWrap) ganttScrollWrap.addEventListener("scroll", syncGanttLabelCurtain, { passive: true });
+  if (ganttScrollWrap) ganttScrollWrap.addEventListener("scroll", () => { syncGanttLabelCurtain(); syncGanttYearLabels(); }, { passive: true });
 
   document.addEventListener("pointermove", (e) => {
     if (!dragTracking) return;

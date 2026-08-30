@@ -328,10 +328,13 @@ select.task-status-badge:disabled { cursor: default; opacity: .85; }
 .today-toggle-btn { font: inherit; font-size: 12.5px; font-weight: 700; color: var(--today); background: color-mix(in srgb, var(--today) 14%, transparent); border: 1px solid color-mix(in srgb, var(--today) 40%, transparent); border-radius: 999px; padding: 6px 12px; cursor: pointer; white-space: nowrap; }
 .today-toggle-btn:hover { background: color-mix(in srgb, var(--today) 22%, transparent); }
 .today-toggle-btn.off { color: var(--ink-muted); background: var(--surface-alt); border-color: var(--border-strong); }
-.gantt-month-row { display: flex; font-size: 12.5px; font-weight: 800; color: var(--ink); border-bottom: 1px solid var(--border); padding-bottom: 5px; margin-bottom: 2px; letter-spacing: .01em; }
+.gantt-year-row { display: flex; height: 20px; font-size: 11px; font-weight: 700; color: var(--ink-2); background: var(--surface-alt); letter-spacing: .01em; }
+.gantt-year-track { display: flex; flex: none; }
+.gantt-year-seg { flex: none; position: relative; box-sizing: border-box; overflow: hidden; border-right: 1px dashed var(--border); }
+.gantt-year-label { position: absolute; top: 0; left: 0; padding: 3px 4px 1px; white-space: nowrap; }
+.gantt-month-row { display: flex; font-size: 12.5px; font-weight: 800; color: var(--ink); background: var(--surface-alt); border-bottom: 1px solid var(--border); padding-bottom: 5px; margin-bottom: 2px; letter-spacing: .01em; }
 .gantt-month-track { display: flex; flex: none; }
 .gantt-month-track span { flex: none; padding: 2px 4px; box-sizing: border-box; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; border-right: 1px dashed var(--border); }
-.gantt-month-track span.alt { background: var(--surface-alt); }
 .gantt-month-line { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--border-strong); z-index: 1; pointer-events: none; }
 .gantt-label-curtain { position: absolute; top: 0; bottom: 0; left: 0; background: var(--surface-alt); z-index: 1; pointer-events: none; }
 .gantt-ruler { display: flex; font-size: 10.5px; color: var(--ink-muted); border-bottom: 1px solid var(--border-strong); padding-bottom: 6px; margin-bottom: 4px; }
