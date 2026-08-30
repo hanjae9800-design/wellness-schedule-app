@@ -8,6 +8,16 @@ const PALETTE = Array.from({ length: 10 }, (_, i) => getComputedStyle(document.d
 const STATUS_LABEL = { todo: "예정", doing: "진행중", done: "완료" };
 const DAYPX = 20;
 
+// 구분(phase) 색을 기준으로 업무/세부업무 행에 옅게 우려낸 색조를 입혀서 3단 구조(구분 > 업무 > 세부업무)가
+// 한눈에 통일감 있게 이어져 보이게 함 — 아래로 내려갈수록 더 옅어짐. color-mix로 그때그때 계산해서
+// 구분마다 색이 달라도(팔레트 10색 전부) 별도 사전 계산 없이 항상 정확히 맞는 색을 만든다.
+const TASK_TINT_PCT = 16;
+const SUBTASK_TINT_PCT = 8;
+function phaseTintCss(phaseColor, pct) {
+  const color = phaseColor || PALETTE[0];
+  return `color-mix(in srgb, ${color} ${pct}%, var(--surface))`;
+}
+
 let state = { project: null, tasks: [], editMode: false };
 let saveTimers = new Map();
 let taskFilters = { phase: "", status: "", owner: "", today: false };
@@ -891,7 +901,7 @@ function buildTaskRowHtml(t, dis) {
   const subtasks = parseSubtasks(t.subtasks);
   const subOpen = openSubtaskRows.has(t.id);
   return `
-    <tr data-id="${t.id}">
+    <tr data-id="${t.id}" style="background:${phaseTintCss(t.phase_color, TASK_TINT_PCT)}">
       <td class="col-drag"><span class="drag-handle">⠿</span></td>
       <td class="col-name"><button type="button" class="task-subtask-caret-btn ${subOpen ? "open" : ""}" data-action="subtask-toggle" data-id="${t.id}" aria-label="세부업무 펼치기"><span class="task-subtask-caret">▾</span></button><input value="${escapeHtml(t.name)}" data-field="name" data-id="${t.id}" ${dis} placeholder="업무명">${subtasks.length ? `<span class="task-subtask-badge">${subtasks.filter(s => s.done).length}/${subtasks.length}</span>` : ""}</td>
       <td class="col-taskstatus">${buildTaskStatusSelectHtml(t, ts, dis)}</td>
@@ -967,8 +977,9 @@ function buildSubtaskSectionHtml(t) {
   const list = parseSubtasks(t.subtasks);
   const dis = !state.editMode;
   const doneCount = list.filter(s => s.done).length;
+  const subtaskTint = phaseTintCss(t.phase_color, SUBTASK_TINT_PCT);
   const itemsHtml = list.map(s => `
-    <div class="subtask-row" data-sub-id="${s.id}">
+    <div class="subtask-row" data-sub-id="${s.id}" style="background:${subtaskTint}">
       ${!dis ? `<span class="drag-handle subtask-drag-handle" title="드래그해서 세부업무 순서 변경">⠿</span>` : ""}
       <input type="checkbox" class="subtask-check" data-id="${t.id}" data-sub-id="${s.id}" ${s.done ? "checked" : ""} ${dis ? "disabled" : ""}>
       <input type="text" class="subtask-name-input${s.done ? " done" : ""}" value="${escapeHtml(s.name)}" data-id="${t.id}" data-sub-id="${s.id}" ${dis ? "disabled" : ""}>
@@ -1437,13 +1448,14 @@ function buildGanttTaskRowHtml(t, minDate, daypx, trackWidth, rowWidth) {
   const barWidth = len * daypx - 3;
   const labelHtml = ts.key === "todo" ? "" : `<span class="gantt-bar-label">${ts.label}</span>`;
   const ownerText = t.owner ? escapeHtml(t.owner) : "미배정";
+  const rowTint = phaseTintCss(t.phase_color, TASK_TINT_PCT);
   return `<div class="gantt-row" style="grid-template-columns:${ganttLabelWidth}px 1fr;width:${rowWidth}px">
-    <div class="gantt-row-label">
+    <div class="gantt-row-label" style="background:${rowTint}">
       <div class="gantt-row-name-box" title="${escapeHtml(t.phase_name || "구분")} · ${escapeHtml(t.name || "")}">${escapeHtml(t.name || "(제목 없음)")}</div>
       <div class="gantt-row-owner-col">${ownerText}</div>
       <div class="gantt-row-status-col"><span class="task-status-badge ${ts.key}">${ts.label}</span></div>
     </div>
-    <div class="gantt-track" style="width:${trackWidth}px">
+    <div class="gantt-track" style="width:${trackWidth}px;background:${rowTint}">
       <div class="gantt-bar ${ts.key}" style="left:${barLeft}px;width:${barWidth}px;background:${barColor}" title="${escapeHtml(t.name)}">${labelHtml}</div>
     </div>
   </div>`;
