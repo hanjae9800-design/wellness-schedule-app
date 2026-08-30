@@ -451,6 +451,7 @@ async function enterProject(projectId) {
   await loadTasks();
   state.editMode = state.project.mode === "edit";
   $("#app").hidden = false;
+  $("#topBar").hidden = false;
   applyChecklistModeUI();
   renderAll();
   applyViewMode();
