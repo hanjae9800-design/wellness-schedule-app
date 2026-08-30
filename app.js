@@ -19,6 +19,8 @@ let collapsedOwnersTable = new Set();
 let viewMode = "all";
 // task ids whose "세부내용" (담당자/시작일/종료일/비고) row is expanded in the 업무 목록 table; session-only, not persisted.
 let openDetailRows = new Set();
+// task ids whose 세부업무(subtask) row is expanded (체크리스트 전용); session-only, not persisted.
+let openSubtaskRows = new Set();
 // pointer-based row reorder tracking (threshold-based: a plain click never moves a row, only a real press-and-move does)
 let dragTracking = null;
 // 업무 체크리스트는 구글 로그인한 본인만 접근 가능; 로그인 안 했으면 null.
@@ -145,7 +147,7 @@ function renderFilterOptions() {
 }
 function applyTaskFilters() {
   const byOwner = viewMode === "owner";
-  $$("#taskTbody tr[data-id]:not(.task-detail-row)").forEach(row => {
+  $$("#taskTbody tr[data-id]:not(.task-detail-row):not(.task-subtask-row)").forEach(row => {
     const t = state.tasks.find(x => x.id === row.dataset.id);
     const groupCollapsed = t && (byOwner ? isOwnerCollapsed(t.owner) : isPhaseCollapsed(t.phase_name, "table"));
     row.hidden = !(t && taskMatchesFilters(t)) || groupCollapsed;
@@ -867,15 +869,19 @@ function buildOwnerGroupHeaderRowHtml(g, collapsed) {
 function buildTaskRowHtml(t, dis) {
   const ts = deriveTaskStatus(t);
   const open = openDetailRows.has(t.id);
+  const isChecklist = state.project && state.project.type === "checklist";
+  const subtasks = isChecklist ? parseSubtasks(t.subtasks) : [];
+  const subOpen = openSubtaskRows.has(t.id);
   return `
     <tr data-id="${t.id}">
       <td class="col-drag"><span class="drag-handle">⠿</span></td>
-      <td class="col-name"><input value="${escapeHtml(t.name)}" data-field="name" data-id="${t.id}" ${dis} placeholder="업무명"></td>
+      <td class="col-name">${isChecklist ? `<button type="button" class="task-subtask-caret-btn ${subOpen ? "open" : ""}" data-action="subtask-toggle" data-id="${t.id}" aria-label="세부업무 펼치기"><span class="task-subtask-caret">▾</span></button>` : ""}<input value="${escapeHtml(t.name)}" data-field="name" data-id="${t.id}" ${dis} placeholder="업무명">${subtasks.length ? `<span class="task-subtask-badge">${subtasks.filter(s => s.done).length}/${subtasks.length}</span>` : ""}</td>
       <td class="col-taskstatus">${buildTaskStatusSelectHtml(t, ts, dis)}</td>
       <td class="col-detail"><button type="button" class="detail-btn ${open ? "open" : ""}" data-action="detail" data-id="${t.id}"><span class="detail-car">▾</span> 세부내용</button></td>
       <td class="col-del">${state.editMode ? `<button class="del-btn" data-action="del" data-id="${t.id}">✕</button>` : ""}</td>
     </tr>
     ${buildTaskDetailRowHtml(t, dis, open)}
+    ${isChecklist ? buildTaskSubtaskRowHtml(t, subOpen) : ""}
   `;
 }
 function buildTaskDetailRowHtml(t, dis, open) {
@@ -929,6 +935,96 @@ function refreshDependencyField(taskId) {
   row.outerHTML = buildDependencyFieldHtml(t);
   const newRow = document.querySelector(`.dep-chip-row[data-id="${taskId}"]`);
   if (newRow) wireDependencyField(newRow.parentElement);
+}
+// ---------- 세부업무 (체크리스트 전용) ----------
+function parseSubtasks(raw) {
+  if (!raw) return [];
+  try {
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.filter(s => s && typeof s.id === "string" && typeof s.name === "string") : [];
+  } catch (e) { return []; }
+}
+function buildSubtaskSectionHtml(t) {
+  const list = parseSubtasks(t.subtasks);
+  const dis = !state.editMode;
+  const doneCount = list.filter(s => s.done).length;
+  const itemsHtml = list.map(s => `
+    <div class="subtask-row" data-sub-id="${s.id}">
+      <input type="checkbox" class="subtask-check" data-id="${t.id}" data-sub-id="${s.id}" ${s.done ? "checked" : ""} ${dis ? "disabled" : ""}>
+      <input type="text" class="subtask-name-input${s.done ? " done" : ""}" value="${escapeHtml(s.name)}" data-id="${t.id}" data-sub-id="${s.id}" ${dis ? "disabled" : ""}>
+      ${!dis ? `<button type="button" class="subtask-del-btn" data-id="${t.id}" data-sub-id="${s.id}" aria-label="삭제">✕</button>` : ""}
+    </div>`).join("");
+  const emptyHtml = !list.length ? `<div class="subtask-empty">세부 업무가 없습니다</div>` : "";
+  const addHtml = !dis ? `
+    <div class="subtask-add-row">
+      <input type="text" class="subtask-add-input" data-id="${t.id}" placeholder="세부 업무 추가 후 Enter">
+    </div>` : "";
+  return `
+    <div class="subtask-section" data-id="${t.id}">
+      <div class="subtask-section-head">세부 업무${list.length ? ` <span class="subtask-count">${doneCount}/${list.length}</span>` : ""}</div>
+      ${itemsHtml}${emptyHtml}${addHtml}
+    </div>`;
+}
+function wireSubtaskSection(root) {
+  root.querySelectorAll(".subtask-check").forEach(cb => {
+    cb.addEventListener("change", () => toggleSubtask(cb.dataset.id, cb.dataset.subId));
+  });
+  root.querySelectorAll(".subtask-name-input").forEach(inp => {
+    inp.addEventListener("change", () => renameSubtask(inp.dataset.id, inp.dataset.subId, inp.value));
+  });
+  root.querySelectorAll(".subtask-del-btn").forEach(btn => {
+    btn.addEventListener("click", () => deleteSubtask(btn.dataset.id, btn.dataset.subId));
+  });
+  root.querySelectorAll(".subtask-add-input").forEach(inp => {
+    inp.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      const name = inp.value.trim();
+      if (!name) return;
+      addSubtask(inp.dataset.id, name);
+    });
+  });
+}
+function refreshSubtaskSection(taskId) {
+  const t = state.tasks.find(x => x.id === taskId);
+  const el = document.querySelector(`.subtask-section[data-id="${taskId}"]`);
+  if (!t || !el) return;
+  el.outerHTML = buildSubtaskSectionHtml(t);
+  const newEl = document.querySelector(`.subtask-section[data-id="${taskId}"]`);
+  if (newEl) wireSubtaskSection(newEl);
+}
+function addSubtask(taskId, name) {
+  const t = state.tasks.find(x => x.id === taskId);
+  if (!t) return;
+  const list = parseSubtasks(t.subtasks);
+  list.push({ id: crypto.randomUUID(), name, done: false });
+  updateTaskField(taskId, "subtasks", JSON.stringify(list));
+  refreshSubtaskSection(taskId);
+}
+function toggleSubtask(taskId, subId) {
+  const t = state.tasks.find(x => x.id === taskId);
+  if (!t) return;
+  const list = parseSubtasks(t.subtasks);
+  const s = list.find(x => x.id === subId);
+  if (!s) return;
+  s.done = !s.done;
+  updateTaskField(taskId, "subtasks", JSON.stringify(list));
+  refreshSubtaskSection(taskId);
+}
+function renameSubtask(taskId, subId, name) {
+  const t = state.tasks.find(x => x.id === taskId);
+  if (!t) return;
+  const list = parseSubtasks(t.subtasks);
+  const s = list.find(x => x.id === subId);
+  if (!s) return;
+  s.name = name.trim();
+  updateTaskField(taskId, "subtasks", JSON.stringify(list));
+}
+function deleteSubtask(taskId, subId) {
+  const t = state.tasks.find(x => x.id === taskId);
+  if (!t) return;
+  const list = parseSubtasks(t.subtasks).filter(x => x.id !== subId);
+  updateTaskField(taskId, "subtasks", JSON.stringify(list));
+  refreshSubtaskSection(taskId);
 }
 function openDependencyPicker(anchorEl, taskId) {
   const picker = $("#depPicker");
@@ -998,7 +1094,7 @@ function openPhaseStatusPopover(anchorEl, phaseKey, statusKey) {
       else { renderTable(); applyTaskFilters(); }
       popover.hidden = true;
       requestAnimationFrame(() => {
-        const row = document.querySelector(`#taskTbody tr[data-id="${id}"]:not(.task-detail-row)`);
+        const row = document.querySelector(`#taskTbody tr[data-id="${id}"]:not(.task-detail-row):not(.task-subtask-row)`);
         row?.scrollIntoView({ behavior: "smooth", block: "center" });
       });
     });
@@ -1017,7 +1113,7 @@ function toggleTaskDetail(id) {
   else openDetailRows.add(id);
   const tbody = $("#taskTbody");
   if (!tbody) return;
-  const btn = tbody.querySelector(`tr[data-id="${id}"]:not(.task-detail-row) [data-action="detail"]`);
+  const btn = tbody.querySelector(`tr[data-id="${id}"]:not(.task-detail-row):not(.task-subtask-row) [data-action="detail"]`);
   const detailTr = tbody.querySelector(`tr.task-detail-row[data-id="${id}"]`);
   const isOpen = openDetailRows.has(id);
   if (btn) btn.classList.toggle("open", isOpen);
@@ -1026,8 +1122,27 @@ function toggleTaskDetail(id) {
     if (isOpen) detailTr.querySelectorAll("textarea.autosize-textarea").forEach(autosizeTextarea);
   }
 }
+function buildTaskSubtaskRowHtml(t, open) {
+  return `<tr class="task-subtask-row" data-id="${t.id}" ${open ? "" : "hidden"}>
+    <td colspan="5">${buildSubtaskSectionHtml(t)}</td>
+  </tr>`;
+}
+function toggleSubtaskRow(id) {
+  if (openSubtaskRows.has(id)) openSubtaskRows.delete(id);
+  else openSubtaskRows.add(id);
+  const tbody = $("#taskTbody");
+  if (!tbody) return;
+  const caretBtn = tbody.querySelector(`[data-action="subtask-toggle"][data-id="${id}"]`);
+  const subTr = tbody.querySelector(`tr.task-subtask-row[data-id="${id}"]`);
+  const isOpen = openSubtaskRows.has(id);
+  if (caretBtn) caretBtn.classList.toggle("open", isOpen);
+  if (subTr) {
+    subTr.hidden = !isOpen;
+    if (isOpen) subTr.querySelector(".subtask-add-input")?.focus();
+  }
+}
 function wireTaskRowEl(tr) {
-  tr.querySelectorAll("input,select,textarea").forEach(el => {
+  tr.querySelectorAll("input[data-field],select[data-field],textarea[data-field]").forEach(el => {
     el.addEventListener("change", () => {
       updateTaskField(el.dataset.id, el.dataset.field, el.value);
       if (["status", "start_date", "end_date", "phase_name"].includes(el.dataset.field)) refreshTaskDerivedViews();
@@ -1037,26 +1152,40 @@ function wireTaskRowEl(tr) {
   if (!tr.hidden) tr.querySelectorAll("textarea.autosize-textarea").forEach(autosizeTextarea);
   tr.querySelectorAll('[data-action="del"]').forEach(el => el.addEventListener("click", () => deleteTask(el.dataset.id)));
   tr.querySelectorAll('[data-action="detail"]').forEach(el => el.addEventListener("click", () => toggleTaskDetail(el.dataset.id)));
+  tr.querySelectorAll('[data-action="subtask-toggle"]').forEach(el => el.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleSubtaskRow(el.dataset.id);
+  }));
   wireDependencyField(tr);
+  wireSubtaskSection(tr);
 }
 function patchTaskRow(taskId) {
   const t = state.tasks.find(x => x.id === taskId);
   const tbody = $("#taskTbody");
   if (!tbody) return;
-  const oldTr = tbody.querySelector(`tr[data-id="${taskId}"]:not(.task-detail-row)`);
+  const oldTr = tbody.querySelector(`tr[data-id="${taskId}"]:not(.task-detail-row):not(.task-subtask-row)`);
   const oldDetailTr = tbody.querySelector(`tr.task-detail-row[data-id="${taskId}"]`);
+  const oldSubtaskTr = tbody.querySelector(`tr.task-subtask-row[data-id="${taskId}"]`);
   if (!t || !oldTr) return;
-  if (oldTr.contains(document.activeElement) || (oldDetailTr && oldDetailTr.contains(document.activeElement))) return;
+  if (oldTr.contains(document.activeElement) || (oldDetailTr && oldDetailTr.contains(document.activeElement)) || (oldSubtaskTr && oldSubtaskTr.contains(document.activeElement))) return;
   const dis = !state.editMode ? "disabled" : "";
   const wrapper = document.createElement("tbody");
   wrapper.innerHTML = buildTaskRowHtml(t, dis);
-  const newTr = wrapper.children[0];
-  const newDetailTr = wrapper.children[1];
+  const newTr = wrapper.querySelector('tr[data-id]:not(.task-detail-row):not(.task-subtask-row)');
+  const newDetailTr = wrapper.querySelector('tr.task-detail-row');
+  const newSubtaskTr = wrapper.querySelector('tr.task-subtask-row');
   oldTr.replaceWith(newTr);
   if (oldDetailTr) oldDetailTr.replaceWith(newDetailTr);
   else newTr.after(newDetailTr);
+  if (newSubtaskTr) {
+    if (oldSubtaskTr) oldSubtaskTr.replaceWith(newSubtaskTr);
+    else newDetailTr.after(newSubtaskTr);
+  } else if (oldSubtaskTr) {
+    oldSubtaskTr.remove();
+  }
   wireTaskRowEl(newTr);
   wireTaskRowEl(newDetailTr);
+  if (newSubtaskTr) wireTaskRowEl(newSubtaskTr);
 }
 function renderTable() {
   const tbody = $("#taskTbody");
@@ -1087,12 +1216,14 @@ function renderTable() {
 // task-detail-row travels along with it as a pair, never dropped on independently.
 const DRAG_THRESHOLD = 6;
 function wireDragReorder(tbody) {
-  tbody.querySelectorAll("tr[data-id]:not(.task-detail-row)").forEach(row => {
+  const isChecklist = state.project && state.project.type === "checklist";
+  tbody.querySelectorAll("tr[data-id]:not(.task-detail-row):not(.task-subtask-row)").forEach(row => {
     row.addEventListener("pointerdown", (e) => {
-      if (e.target.matches('input[data-field="name"]')) return;
+      if (e.target.matches('input[data-field="name"]') || e.target.closest('.task-subtask-caret-btn')) return;
       if (e.button !== 0) return;
       const detailEl = tbody.querySelector(`tr.task-detail-row[data-id="${row.dataset.id}"]`);
-      dragTracking = { row, detailEl, startX: e.clientX, startY: e.clientY, dragging: false };
+      const subtaskEl = isChecklist ? tbody.querySelector(`tr.task-subtask-row[data-id="${row.dataset.id}"]`) : null;
+      dragTracking = { row, detailEl, subtaskEl, startX: e.clientX, startY: e.clientY, dragging: false };
     });
   });
 }
@@ -1523,20 +1654,23 @@ function wireStaticUI() {
       dragTracking.dragging = true;
       dragTracking.row.classList.add("dragging");
     }
-    const overRow = document.elementFromPoint(e.clientX, e.clientY)?.closest("tr[data-id]:not(.task-detail-row)");
+    const overRow = document.elementFromPoint(e.clientX, e.clientY)?.closest("tr[data-id]:not(.task-detail-row):not(.task-subtask-row)");
     if (!overRow || overRow === dragTracking.row) return;
     const rect = overRow.getBoundingClientRect();
     const before = (e.clientY - rect.top) < rect.height / 2;
     const targetDetail = overRow.parentNode.querySelector(`tr.task-detail-row[data-id="${overRow.dataset.id}"]`);
-    overRow.parentNode.insertBefore(dragTracking.row, before ? overRow : (targetDetail ? targetDetail.nextSibling : overRow.nextSibling));
+    const targetSubtask = overRow.parentNode.querySelector(`tr.task-subtask-row[data-id="${overRow.dataset.id}"]`);
+    const insertAfterEl = targetSubtask || targetDetail || overRow;
+    overRow.parentNode.insertBefore(dragTracking.row, before ? overRow : insertAfterEl.nextSibling);
     if (dragTracking.detailEl) overRow.parentNode.insertBefore(dragTracking.detailEl, dragTracking.row.nextSibling);
+    if (dragTracking.subtaskEl) overRow.parentNode.insertBefore(dragTracking.subtaskEl, dragTracking.detailEl ? dragTracking.detailEl.nextSibling : dragTracking.row.nextSibling);
   });
   document.addEventListener("pointerup", () => {
     if (!dragTracking) return;
     if (dragTracking.dragging) {
       dragTracking.row.classList.remove("dragging");
       const tbody = $("#taskTbody");
-      const ids = Array.from(tbody.querySelectorAll("tr[data-id]:not(.task-detail-row)")).map(r => r.dataset.id);
+      const ids = Array.from(tbody.querySelectorAll("tr[data-id]:not(.task-detail-row):not(.task-subtask-row)")).map(r => r.dataset.id);
       state.tasks.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
       persistOrder();
     }
