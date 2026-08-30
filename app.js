@@ -1292,8 +1292,21 @@ function renderGantt() {
   wrap.innerHTML = buildGanttHtml(state.tasks, DAYPX, true, true);
   wireGanttResizer();
   wirePhaseToggles(wrap, "gantt");
+  syncGanttCurtainTop(wrap);
   syncGanttLabelCurtain();
   syncGanttYearLabels();
+}
+
+// 라벨 커튼(.gantt-label-curtain)은 예전엔 헤더까지 포함한 전체 높이를 덮어도 헤더 배경이 같은 색이라
+// 안 보였는데, 헤더 행들을 더 밝은 색으로 바꾸면서 커튼의 진한 색이 그 위에 그대로 드러나 보이게 됐음
+// (커튼이 sticky 라벨보다 위에 그려지는 stacking 특성 때문). 그래서 커튼은 헤더 아래, 실제 업무 행이
+// 시작하는 지점부터만 덮도록 top 값을 실측해서 맞춘다.
+function syncGanttCurtainTop(wrap) {
+  const curtain = wrap.querySelector(".gantt-label-curtain");
+  const firstRow = wrap.querySelector(".gantt-row");
+  if (!curtain || !firstRow) return;
+  const headerH = firstRow.getBoundingClientRect().top - wrap.getBoundingClientRect().top;
+  if (headerH > 0) curtain.style.top = headerH + "px";
 }
 
 // 오늘 열/월 경계선이 행과 행 사이 미세한 틈으로 삐져나오는 것을 막기 위해, 라벨 폭만큼 통짜
@@ -1873,8 +1886,10 @@ function wireStaticUI() {
     renderHeader();
   });
   $("#timelineOpenBtn").addEventListener("click", () => {
-    $("#ganttOverlayBody").innerHTML = buildGanttHtml(state.tasks, 14, false);
+    const overlayBody = $("#ganttOverlayBody");
+    overlayBody.innerHTML = buildGanttHtml(state.tasks, 14, false);
     $("#ganttOverlay").hidden = false;
+    syncGanttCurtainTop(overlayBody);
   });
   $("#timelineCloseBtn").addEventListener("click", () => { $("#ganttOverlay").hidden = true; });
   $("#ownerSummaryToggleBtn").addEventListener("click", () => {
