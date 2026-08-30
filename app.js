@@ -1514,20 +1514,14 @@ function buildGanttHtml(tasks, daypx, grouped = true, extendRange = false) {
     groups.forEach(g => {
       const collapsed = isPhaseCollapsed(g.key, "gantt");
       const groupColor = g.color || PALETTE[0];
-      const groupDated = g.tasks.filter(t => t.start_date && t.end_date);
-      let groupBarHtml = "";
-      if (groupDated.length) {
-        const gMin = groupDated.reduce((m, t) => t.start_date < m ? t.start_date : m, groupDated[0].start_date);
-        const gMax = groupDated.reduce((m, t) => t.end_date > m ? t.end_date : m, groupDated[0].end_date);
-        const gOff = daysBetween(minDate, gMin);
-        const gLen = Math.max(1, daysBetween(gMin, gMax) + 1);
-        groupBarHtml = `<div class="gantt-group-bar" style="left:${gOff * daypx}px;width:${gLen * daypx - 3}px;background:${groupColor}"></div>`;
-      }
+      // 구분 행은 라벨과 날짜 트랙을 나누지 않고 한 가지 색으로 통째로 병합 — 예전엔 트랙 쪽에
+      // 그 구분 업무들 날짜 범위만 옅게 칠한 막대(group-bar)를 따로 얹었는데, 행 전체가 이제
+      // 같은 색이라 그 막대는 의미가 없어져서 뺐다.
       html += `<div class="gantt-row gantt-phase-row" data-phase="${escapeHtml(g.key)}" style="grid-template-columns:${ganttLabelWidth}px 1fr;width:${rowWidth}px">
         <div class="gantt-row-label gantt-phase-label" style="background:${groupColor}">
           <button type="button" class="phase-group-toggle" style="background:${groupColor}">${buildPhaseHeaderInnerHtml(g, collapsed)}</button>
         </div>
-        <div class="gantt-track" style="width:${trackWidth}px">${groupBarHtml}</div>
+        <div class="gantt-track" style="width:${trackWidth}px;background:${groupColor}"></div>
       </div>`;
 
       if (collapsed) return;

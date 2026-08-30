@@ -302,8 +302,6 @@ select.task-status-badge:disabled { cursor: default; opacity: .85; }
 .gantt-phase-label .phase-group-caret { color: rgba(255,255,255,0.85); }
 .gantt-phase-label .phase-group-dot { display: none; }
 .gantt-phase-label .phase-group-count { background: rgba(255,255,255,0.24); color: #fff; border-color: transparent; }
-.gantt-phase-row .gantt-track { background: var(--surface-alt); }
-.gantt-group-bar { position: absolute; top: 50%; transform: translateY(-50%); height: 14px; border-radius: 5px; opacity: .55; }
 
 .gantt-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow-x: auto; overflow-y: hidden; padding: 14px 14px 14px 0; margin-bottom: 20px; box-shadow: var(--shadow); }
 .section-head { margin: 4px 0 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
