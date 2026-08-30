@@ -176,9 +176,24 @@ function applyChecklistModeUI() {
   $("#todayFilterBtn").hidden = !isChecklist;
   $("#todayFilterBtnMobile").hidden = !isChecklist;
   $("#titleSuffix").hidden = isChecklist;
-  // PM(프로젝트 매니저)은 프로젝트 추진일정에만 해당하는 개념이라 체크리스트에서는 숨김
+  $("#checklistTitleLabel").hidden = !isChecklist;
+  // 상위 사업명/부서명/PM/팀원은 조직·프로젝트 개념이라 개인용 체크리스트에서는 전부 불필요 —
+  // 체크리스트 제목도 편집 가능한 입력칸 대신 고정 라벨("업무 체크리스트")로 대체.
+  $("#projNameInput").hidden = isChecklist;
+  $("#orgInput").hidden = isChecklist;
+  $("#orgSep").hidden = isChecklist;
+  $("#deptInput").hidden = isChecklist;
+  $("#deptSep").hidden = isChecklist;
   $("#pmInput").hidden = isChecklist;
   $("#pmSep").hidden = isChecklist;
+  $("#teamChipRow").hidden = isChecklist;
+  $("#teamAddBtn").hidden = isChecklist;
+  // 담당자 지정도 조직/팀 개념이라 체크리스트에서는 불필요 — 담당자 필터·현황 UI 숨김
+  // ("담당자별 업무" 보기는 뷰 전환 버튼 자체가 이미 위에서 숨겨져 있어 별도 처리 불필요)
+  $("#filterOwner").hidden = isChecklist;
+  $("#filterOwnerMobile").hidden = isChecklist;
+  $("#ownerSummaryToggleBtn").hidden = isChecklist;
+  if (isChecklist) $("#ownerSummary").hidden = true;
   if (isChecklist) {
     taskFilters.today = true;
     wireTodayFilter();
@@ -888,10 +903,11 @@ function buildTaskRowHtml(t, dis) {
   `;
 }
 function buildTaskDetailRowHtml(t, dis, open) {
+  const isChecklist = state.project && state.project.type === "checklist";
   return `<tr class="task-detail-row" data-id="${t.id}" ${open ? "" : "hidden"}>
     <td colspan="5">
       <div class="task-detail-inner">
-        <div class="task-detail-field"><label>담당자</label>${buildOwnerSelectHtml(t.owner, t.id, dis)}</div>
+        ${isChecklist ? "" : `<div class="task-detail-field"><label>담당자</label>${buildOwnerSelectHtml(t.owner, t.id, dis)}</div>`}
         <div class="task-detail-field"><label>시작일</label><input type="date" value="${t.start_date || ""}" data-field="start_date" data-id="${t.id}" ${dis}></div>
         <div class="task-detail-field"><label>종료일</label><input type="date" value="${t.end_date || ""}" data-field="end_date" data-id="${t.id}" ${dis}></div>
         <div class="task-detail-field"><label>선행업무</label>${buildDependencyFieldHtml(t)}</div>
@@ -1480,6 +1496,7 @@ function buildGanttHtml(tasks, daypx, grouped = true, extendRange = false) {
 
 function buildTaskCardHtml(t, idx, dis) {
   const ts = deriveTaskStatus(t);
+  const isChecklist = state.project && state.project.type === "checklist";
   return `
     <div class="task-card" data-id="${t.id}">
       <div class="card-top">
@@ -1494,9 +1511,9 @@ function buildTaskCardHtml(t, idx, dis) {
         </div>` : ""}
       </div>
       <input class="card-name-input" value="${escapeHtml(t.name)}" data-field="name" data-id="${t.id}" ${dis} placeholder="업무명">
-      <div class="card-row">
+      ${isChecklist ? "" : `<div class="card-row">
         <div class="card-field"><label>담당자</label>${buildOwnerSelectHtml(t.owner, t.id, dis)}</div>
-      </div>
+      </div>`}
       <div class="card-row">
         <div class="card-field"><label>시작일</label><input type="date" value="${t.start_date || ""}" data-field="start_date" data-id="${t.id}" ${dis}></div>
         <div class="card-field"><label>종료일</label><input type="date" value="${t.end_date || ""}" data-field="end_date" data-id="${t.id}" ${dis}></div>

@@ -84,9 +84,9 @@
     <div class="eyebrow-fields">
       <a href="./" class="back-link">← 목록</a>
       <input id="orgInput" class="eyebrow-input" placeholder="상위 사업명">
-      <span class="eyebrow-sep">/</span>
+      <span class="eyebrow-sep" id="orgSep">/</span>
       <input id="deptInput" class="eyebrow-input" placeholder="부서명">
-      <span class="eyebrow-sep">/</span>
+      <span class="eyebrow-sep" id="deptSep">/</span>
       <input id="pmInput" class="eyebrow-input" placeholder="PM(담당자)">
       <span class="eyebrow-sep" id="pmSep">/</span>
       <div class="team-chip-row" id="teamChipRow"></div>
@@ -95,6 +95,7 @@
     <h1 class="title">
       <input id="projNameInput" class="title-input" placeholder="프로젝트명만 입력">
       <span class="title-suffix" id="titleSuffix">추진일정</span>
+      <span class="title-suffix" id="checklistTitleLabel" hidden>업무 체크리스트</span>
     </h1>
     <div class="head-actions">
       <span class="saving-dot" id="savingDot" hidden>저장 중…</span>
