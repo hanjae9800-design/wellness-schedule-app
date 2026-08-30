@@ -426,6 +426,7 @@ async function enterProject(projectId) {
   renderAll();
   applyViewMode();
   wireStaticUI();
+  wireTodayToggle();
   wireModeToggle();
   wireViewNav();
   wireFileImportDragDrop();
@@ -1102,23 +1103,11 @@ function renderGantt() {
   wrap.innerHTML = buildGanttHtml(state.tasks, DAYPX, true, true);
   wireGanttResizer();
   wirePhaseToggles(wrap, "gantt");
-  syncGanttHeaderHeight(wrap);
   syncGanttLabelCurtain();
 }
 
-// 오늘 표시선(.gantt-today-line)은 월/날짜 헤더 아래부터 시작하도록 top 값을 CSS 변수로 잡는데,
-// 헤더의 실제 높이(폰트/여백 조정 등으로 계속 바뀔 수 있음)를 하드코딩해두면 어긋나서 헤더와 첫 행
-// 사이 여백 틈으로 선이 살짝 삐져나와 보이는 문제가 있었음 — 렌더할 때마다 실측해서 맞춰준다.
-function syncGanttHeaderHeight(wrap) {
-  const monthRow = wrap.querySelector(".gantt-month-row");
-  const firstRow = wrap.querySelector(".gantt-row");
-  if (!monthRow || !firstRow) return;
-  const headerH = firstRow.getBoundingClientRect().top - monthRow.getBoundingClientRect().top;
-  if (headerH > 0) wrap.style.setProperty("--gantt-header-h", headerH + "px");
-}
-
-// 오늘선/월 경계선이 행과 행 사이 미세한 틈으로 삐져나오는 것을 막기 위해, 라벨 폭만큼 통짜
-// 배경(.gantt-label-curtain)을 깔아둔다. 이 배경도 .gantt-today-line처럼 position:absolute라서
+// 오늘 열/월 경계선이 행과 행 사이 미세한 틈으로 삐져나오는 것을 막기 위해, 라벨 폭만큼 통짜
+// 배경(.gantt-label-curtain)을 깔아둔다. 이 배경도 .gantt-today-col처럼 position:absolute라서
 // (grid 레이아웃에 별도 행을 만들지 않고, top:0;bottom:0으로 전체 높이를 정확히 채움) 안전하지만,
 // absolute는 스크롤 콘텐츠 기준으로 움직이기 때문에 sticky 라벨처럼 화면에 고정해서 보이게 하려면
 // 가로 스크롤할 때마다 left 값을 스크롤 위치만큼 직접 맞춰줘야 한다 — 그래서 스크롤 이벤트로 동기화.
@@ -1133,6 +1122,28 @@ function loadGanttLabelWidth() {
   return Number.isFinite(v) && v >= 100 && v <= 400 ? v : 260;
 }
 let ganttLabelWidth = loadGanttLabelWidth();
+
+function loadShowTodayCol() {
+  const v = localStorage.getItem("ganttShowToday");
+  return v === null ? true : v === "1";
+}
+let showTodayCol = loadShowTodayCol();
+function wireTodayToggle() {
+  const btn = $("#todayToggleBtn");
+  if (!btn) return;
+  const applyBtnState = () => {
+    btn.classList.toggle("off", !showTodayCol);
+    btn.textContent = showTodayCol ? "🟢 오늘 표시" : "오늘 표시 (숨김)";
+    btn.title = showTodayCol ? "간트차트에서 오늘 날짜 강조를 숨기려면 클릭" : "간트차트에서 오늘 날짜 강조를 다시 보이려면 클릭";
+  };
+  applyBtnState();
+  btn.addEventListener("click", () => {
+    showTodayCol = !showTodayCol;
+    try { localStorage.setItem("ganttShowToday", showTodayCol ? "1" : "0"); } catch (e) {}
+    applyBtnState();
+    renderGantt();
+  });
+}
 function wireGanttResizer() {
   const handle = $("#ganttResizer");
   if (!handle) return;
@@ -1278,11 +1289,12 @@ function buildGanttHtml(tasks, daypx, grouped = true, extendRange = false) {
     }
   });
 
-  const todayOffsetDays = daysBetween(minDate, today);
-  if (todayOffsetDays >= 0 && todayOffsetDays <= totalDays) {
-    const todayLeft = ganttLabelWidth + todayOffsetDays * daypx;
-    const todayLabelDate = new Date(today);
-    html += `<div class="gantt-today-line" style="left:${todayLeft}px"><span class="gantt-today-label">오늘 (${todayLabelDate.getMonth() + 1}/${todayLabelDate.getDate()})</span></div>`;
+  if (showTodayCol) {
+    const todayOffsetDays = daysBetween(minDate, today);
+    if (todayOffsetDays >= 0 && todayOffsetDays <= totalDays) {
+      const todayLeft = ganttLabelWidth + todayOffsetDays * daypx;
+      html += `<div class="gantt-today-col" style="left:${todayLeft}px;width:${daypx}px"></div>`;
+    }
   }
 
   // 오늘선/월 경계선은 각 행의 고정(sticky) 라벨 배경으로 가려지는 구조라, 행과 행 사이의

@@ -4,7 +4,7 @@
   --ink: #10160F; --ink-2: #55605A; --ink-muted: #8B948B;
   --border: rgba(16,22,15,0.11); --border-strong: rgba(16,22,15,0.18);
   --accent: #1F6F53; --accent-ink: #FFFFFF; --accent-warm: #B9790E;
-  --good: #0ca30c; --warning: #fab219; --critical: #d03b3b; --delay: #a83232; --today: #ea580c;
+  --good: #0ca30c; --warning: #fab219; --critical: #d03b3b; --delay: #a83232; --today: #0d9488;
   --shadow: 0 1px 2px rgba(16,22,15,0.06), 0 8px 24px -12px rgba(16,22,15,0.18);
 
   /* 서로 뚜렷이 구분되도록 정리한 구분(phase) 색상 팔레트. 진행중/지연/완료 상태색(초록·빨강·회색)과 겹치는 색은 넣지 않습니다. */
@@ -18,7 +18,7 @@
     --ink: #F5F7F5; --ink-2: #C2C7C0; --ink-muted: #8B9088;
     --border: rgba(255,255,255,0.11); --border-strong: rgba(255,255,255,0.20);
     --accent: #4FB58C; --accent-ink: #08130E; --accent-warm: #E3A63C;
-    --delay: #c14545; --today: #f2984a;
+    --delay: #c14545; --today: #2dd4bf;
   }
 }
 :root[data-theme="dark"] {
@@ -291,8 +291,10 @@ select.task-status-badge:disabled { cursor: default; opacity: .85; }
 .gantt-resizer::after { content: ""; position: absolute; top: 20%; bottom: 20%; left: 50%; width: 3px; transform: translateX(-50%); background: var(--border-strong); border-radius: 3px; }
 .gantt-resizer:hover::after, .gantt-resizer.active::after { background: var(--accent); width: 4px; top: 10%; bottom: 10%; }
 .gantt-resizer:hover, .gantt-resizer.active { background: var(--accent); opacity: .18; }
-.gantt-today-line { position: absolute; top: var(--gantt-header-h, 28px); bottom: 0; width: 4px; background: var(--today); z-index: 1; pointer-events: none; }
-.gantt-today-label { position: absolute; top: 0; left: 6px; font-size: 10px; font-weight: 700; color: var(--today); white-space: nowrap; background: var(--surface); padding: 0 3px; border-radius: 3px; }
+.gantt-today-col { position: absolute; top: 0; bottom: 0; border-left: 2px solid var(--today); border-right: 2px solid var(--today); background: color-mix(in srgb, var(--today) 13%, transparent); z-index: 1; pointer-events: none; box-sizing: border-box; }
+.today-toggle-btn { font: inherit; font-size: 12.5px; font-weight: 700; color: var(--today); background: color-mix(in srgb, var(--today) 14%, transparent); border: 1px solid color-mix(in srgb, var(--today) 40%, transparent); border-radius: 999px; padding: 6px 12px; cursor: pointer; white-space: nowrap; }
+.today-toggle-btn:hover { background: color-mix(in srgb, var(--today) 22%, transparent); }
+.today-toggle-btn.off { color: var(--ink-muted); background: var(--surface-alt); border-color: var(--border-strong); }
 .gantt-month-row { display: flex; font-size: 12.5px; font-weight: 800; color: var(--ink); border-bottom: 1px solid var(--border); padding-bottom: 5px; margin-bottom: 2px; letter-spacing: .01em; }
 .gantt-month-track { display: flex; flex: none; }
 .gantt-month-track span { flex: none; padding: 2px 0 2px 6px; box-sizing: border-box; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-right: 1px dashed var(--border); }
