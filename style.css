@@ -1,7 +1,7 @@
 :root {
   color-scheme: light;
   /* 바우하우스 포스터 톤 — 크림 바탕 + 원색(파랑·빨강·노랑·녹색) */
-  --page: #EFE6D2; --surface: #FAF4E7; --surface-alt: #E5D6B4;
+  --page: #F0E6CC; --surface: #FFFCF3; --surface-alt: #ECE0BE;
   --ink: #1A1712; --ink-2: #56504A; --ink-muted: #8F877A;
   --border: rgba(26,23,18,0.15); --border-strong: rgba(26,23,18,0.28);
   --accent: #1B4C9E; --accent-ink: #FFFFFF; --accent-warm: #DFA22E;
@@ -16,7 +16,7 @@
   :root:not([data-theme="light"]) {
     color-scheme: dark;
     /* 파란 표범 그림 톤 — 짙은 청록 바탕 + 크림 텍스트 + 테라코타 포인트 */
-    --page: #16323B; --surface: #1D3F49; --surface-alt: #234B56;
+    --page: #0E2229; --surface: #1D3F49; --surface-alt: #234B56;
     --ink: #EDE6D3; --ink-2: #C4BEA8; --ink-muted: #7FA0A8;
     --border: rgba(237,230,211,0.12); --border-strong: rgba(237,230,211,0.22);
     --accent: #4A93AC; --accent-ink: #0E2229; --accent-warm: #C46B45;
@@ -26,7 +26,7 @@
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --page: #16323B; --surface: #1D3F49; --surface-alt: #234B56;
+  --page: #0E2229; --surface: #1D3F49; --surface-alt: #234B56;
   --ink: #EDE6D3; --ink-2: #C4BEA8; --ink-muted: #7FA0A8;
   --border: rgba(237,230,211,0.12); --border-strong: rgba(237,230,211,0.22);
   --accent: #4A93AC; --accent-ink: #0E2229; --accent-warm: #C46B45;
