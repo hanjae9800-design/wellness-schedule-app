@@ -1,33 +1,37 @@
 :root {
   color-scheme: light;
-  --page: #F3F6F3; --surface: #FCFDFC; --surface-alt: #F0F4F0;
-  --ink: #10160F; --ink-2: #55605A; --ink-muted: #8B948B;
-  --border: rgba(16,22,15,0.11); --border-strong: rgba(16,22,15,0.18);
-  --accent: #1F6F53; --accent-ink: #FFFFFF; --accent-warm: #B9790E;
-  --good: #0ca30c; --warning: #fab219; --critical: #d03b3b; --delay: #a83232; --today: #0d9488;
-  --shadow: 0 1px 2px rgba(16,22,15,0.06), 0 8px 24px -12px rgba(16,22,15,0.18);
+  /* 바우하우스 포스터 톤 — 크림 바탕 + 원색(파랑·빨강·노랑·녹색) */
+  --page: #EFE6D2; --surface: #FAF4E7; --surface-alt: #E5D6B4;
+  --ink: #1A1712; --ink-2: #56504A; --ink-muted: #8F877A;
+  --border: rgba(26,23,18,0.15); --border-strong: rgba(26,23,18,0.28);
+  --accent: #1B4C9E; --accent-ink: #FFFFFF; --accent-warm: #DFA22E;
+  --good: #3E7A3A; --warning: #DFA22E; --critical: #C6362A; --delay: #C6362A; --today: #0d9488;
+  --shadow: 0 1px 2px rgba(26,23,18,0.08), 0 8px 24px -12px rgba(26,23,18,0.28);
 
-  /* 서로 뚜렷이 구분되도록 정리한 구분(phase) 색상 팔레트. 진행중/지연/완료 상태색(초록·빨강·회색)과 겹치는 색은 넣지 않습니다. */
-  --p1: #2563eb; --p2: #0891b2; --p3: #4338ca; --p4: #7c3aed; --p5: #a21caf;
-  --p6: #db2777; --p7: #9d174d; --p8: #ea580c; --p9: #ca8a04; --p10: #b45309;
+  /* 서로 뚜렷이 구분되도록 정리한 구분(phase) 색상 팔레트. 진행중/지연/완료 상태색과 겹치는 색은 넣지 않습니다. */
+  --p1: #115E59; --p2: #0891b2; --p3: #4338ca; --p4: #7c3aed; --p5: #a21caf;
+  --p6: #db2777; --p7: #9d174d; --p8: #ea580c; --p9: #52525B; --p10: #b45309;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --page: #0D120F; --surface: #171F1A; --surface-alt: #1C261F;
-    --ink: #F5F7F5; --ink-2: #C2C7C0; --ink-muted: #8B9088;
-    --border: rgba(255,255,255,0.11); --border-strong: rgba(255,255,255,0.20);
-    --accent: #4FB58C; --accent-ink: #08130E; --accent-warm: #E3A63C;
-    --delay: #c14545; --today: #2dd4bf;
+    /* 파란 표범 그림 톤 — 짙은 청록 바탕 + 크림 텍스트 + 테라코타 포인트 */
+    --page: #16323B; --surface: #1D3F49; --surface-alt: #234B56;
+    --ink: #EDE6D3; --ink-2: #C4BEA8; --ink-muted: #7FA0A8;
+    --border: rgba(237,230,211,0.12); --border-strong: rgba(237,230,211,0.22);
+    --accent: #4A93AC; --accent-ink: #0E2229; --accent-warm: #C46B45;
+    --good: #6FA66B; --warning: #C46B45; --critical: #D2573A; --delay: #D2573A; --today: #2dd4bf;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 22px -12px rgba(0,0,0,0.5);
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --page: #0D120F; --surface: #171F1A; --surface-alt: #1C261F;
-  --ink: #F5F7F5; --ink-2: #C2C7C0; --ink-muted: #8B9088;
-  --border: rgba(255,255,255,0.11); --border-strong: rgba(255,255,255,0.20);
-  --accent: #4FB58C; --accent-ink: #08130E; --accent-warm: #E3A63C;
-  --delay: #c14545; --today: #2dd4bf;
+  --page: #16323B; --surface: #1D3F49; --surface-alt: #234B56;
+  --ink: #EDE6D3; --ink-2: #C4BEA8; --ink-muted: #7FA0A8;
+  --border: rgba(237,230,211,0.12); --border-strong: rgba(237,230,211,0.22);
+  --accent: #4A93AC; --accent-ink: #0E2229; --accent-warm: #C46B45;
+  --good: #6FA66B; --warning: #C46B45; --critical: #D2573A; --delay: #D2573A; --today: #2dd4bf;
+  --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 22px -12px rgba(0,0,0,0.5);
 }
 * { box-sizing: border-box; }
 body {
@@ -139,9 +143,9 @@ h1.title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; font
 .mode-badge { font-size: 11px; font-weight: 700; padding: 4px 9px; border-radius: 999px; background: var(--surface-alt); color: var(--ink-2); border: 1px solid var(--border); }
 .mode-badge.edit { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .proj-status-badge { font-size: 11px; font-weight: 700; padding: 4px 9px; border-radius: 999px; background: var(--surface-alt); color: var(--ink-2); border: 1px solid var(--border); }
-.proj-status-badge.delayed { background: rgba(168,50,50,0.14); color: var(--delay); border-color: transparent; }
-.proj-status-badge.doing { background: rgba(31,111,83,0.14); color: var(--accent); border-color: transparent; }
-.proj-status-badge.done { background: rgba(12,163,12,0.14); color: var(--good); border-color: transparent; }
+.proj-status-badge.delayed { background: color-mix(in srgb, var(--delay) 14%, transparent); color: var(--delay); border-color: transparent; }
+.proj-status-badge.doing { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); border-color: transparent; }
+.proj-status-badge.done { background: color-mix(in srgb, var(--good) 14%, transparent); color: var(--good); border-color: transparent; }
 .proj-status-select { font: inherit; font-size: 12.5px; font-weight: 700; padding: 6px 10px; border-radius: 9px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--ink); cursor: pointer; }
 
 .stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
@@ -157,9 +161,9 @@ h1.title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; font
 .owner-summary-name { font-size: 12.5px; font-weight: 700; color: var(--ink); }
 .owner-summary-counts { display: flex; gap: 6px; flex-wrap: wrap; }
 .owner-count { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: var(--surface-alt); color: var(--ink-2); }
-.owner-count.doing { background: rgba(31,111,83,0.14); color: var(--accent); }
-.owner-count.delayed { background: rgba(168,50,50,0.14); color: var(--delay); }
-.owner-count.done { background: rgba(12,163,12,0.14); color: var(--good); }
+.owner-count.doing { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+.owner-count.delayed { background: color-mix(in srgb, var(--delay) 14%, transparent); color: var(--delay); }
+.owner-count.done { background: color-mix(in srgb, var(--good) 14%, transparent); color: var(--good); }
 .owner-summary-bar { height: 6px; border-radius: 4px; background: var(--surface-alt); overflow: hidden; }
 .owner-summary-bar-fill { height: 100%; background: var(--accent); border-radius: 4px; transition: width .2s ease; }
 .owner-summary-pct { font-size: 11.5px; color: var(--ink-muted); text-align: right; }
@@ -184,7 +188,7 @@ h1.title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; font
 
 /* ---- desktop table ---- */
 .table-scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
-.task-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+.task-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; color: var(--ink); }
 .task-table th { position: relative; text-align: center; font-size: 11.5px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.04em; padding: 10px 10px; border-bottom: 1px solid var(--border-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .task-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; overflow: hidden; }
 .col-resizer { position: absolute; top: 0; right: -5px; width: 10px; height: 100%; cursor: col-resize; user-select: none; z-index: 3; }
@@ -209,9 +213,9 @@ h1.title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; font
 .phase-pill input { color: inherit; font-weight: inherit; padding: 0; background: transparent; border: none; width: auto; min-width: 40px; text-align: center; }
 .col-taskstatus { width: 76px; text-align: center; }
 .task-status-badge { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: var(--surface-alt); color: var(--ink-2); border: 1px solid var(--border); white-space: nowrap; }
-.task-status-badge.delayed { background: rgba(168,50,50,0.14); color: var(--delay); border-color: transparent; }
-.task-status-badge.doing { background: rgba(31,111,83,0.14); color: var(--accent); border-color: transparent; }
-.task-status-badge.done { background: rgba(139,148,139,0.18); color: var(--ink-muted); border-color: transparent; }
+.task-status-badge.delayed { background: color-mix(in srgb, var(--delay) 14%, transparent); color: var(--delay); border-color: transparent; }
+.task-status-badge.doing { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); border-color: transparent; }
+.task-status-badge.done { background: color-mix(in srgb, var(--ink-muted) 18%, transparent); color: var(--ink-muted); border-color: transparent; }
 select.task-status-badge { cursor: pointer; appearance: none; -webkit-appearance: none; -moz-appearance: none; text-align: center; text-align-last: center; }
 select.task-status-badge:disabled { cursor: default; opacity: .85; }
 .task-table select.task-status-badge { width: auto; padding: 3px 8px; border-radius: 999px; background: var(--surface-alt); border: 1px solid var(--border); }
