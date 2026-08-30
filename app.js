@@ -1297,28 +1297,31 @@ function renderGantt() {
   syncGanttYearLabels();
 }
 
-// 라벨 커튼(.gantt-label-curtain)은 예전엔 헤더까지 포함한 전체 높이를 덮어도 헤더 배경이 같은 색이라
-// 안 보였는데, 헤더 행들을 더 밝은 색으로 바꾸면서 커튼의 진한 색이 그 위에 그대로 드러나 보이게 됐음
-// (커튼이 sticky 라벨보다 위에 그려지는 stacking 특성 때문). 그래서 커튼은 헤더 아래, 실제 업무 행이
-// 시작하는 지점부터만 덮도록 top 값을 실측해서 맞춘다.
+// 라벨 커튼은 헤더(연도/월/날짜, 밝은색)용과 업무 목록(진한색)용 두 장으로 나뉘어 있음 — 색이 서로
+// 달라서 하나로 합칠 수 없음. 이 함수가 헤더 실제 높이를 실측해서 헤더용 커튼 높이를 그만큼 채우고,
+// 업무 목록용 커튼은 그 바로 아래부터 시작하도록 이어붙인다 — 둘이 맞닿아서 전체 높이를 빈틈없이 덮음.
 function syncGanttCurtainTop(wrap) {
-  const curtain = wrap.querySelector(".gantt-label-curtain");
+  const headerCurtain = wrap.querySelector(".gantt-label-curtain-header");
+  const dataCurtain = wrap.querySelector(".gantt-label-curtain");
   const firstRow = wrap.querySelector(".gantt-row");
-  if (!curtain || !firstRow) return;
+  if (!headerCurtain || !dataCurtain || !firstRow) return;
   const headerH = firstRow.getBoundingClientRect().top - wrap.getBoundingClientRect().top;
-  if (headerH > 0) curtain.style.top = headerH + "px";
+  if (headerH > 0) {
+    headerCurtain.style.height = headerH + "px";
+    dataCurtain.style.top = headerH + "px";
+  }
 }
 
-// 오늘 열/월 경계선이 행과 행 사이 미세한 틈으로 삐져나오는 것을 막기 위해, 라벨 폭만큼 통짜
-// 배경(.gantt-label-curtain)을 깔아둔다. 이 배경도 .gantt-today-col처럼 position:absolute라서
-// (grid 레이아웃에 별도 행을 만들지 않고, top:0;bottom:0으로 전체 높이를 정확히 채움) 안전하지만,
+// 오늘 열/월 경계선이 라벨 칸 뒤로 삐져나오는 것을 막기 위해, 라벨 폭만큼 통짜 배경(커튼)을 깔아둔다.
+// 이 배경은 .gantt-today-col처럼 position:absolute라서(grid 레이아웃에 별도 행을 만들지 않음) 안전하지만,
 // absolute는 스크롤 콘텐츠 기준으로 움직이기 때문에 sticky 라벨처럼 화면에 고정해서 보이게 하려면
 // 가로 스크롤할 때마다 left 값을 스크롤 위치만큼 직접 맞춰줘야 한다 — 그래서 스크롤 이벤트로 동기화.
+// 헤더용/업무 목록용 커튼 둘 다 같은 방식으로 움직여야 화면에서 나란히 붙어 보인다.
 function syncGanttLabelCurtain() {
   const scrollWrap = $("#ganttWrap");
-  const curtain = document.querySelector("#gantt .gantt-label-curtain");
-  if (!scrollWrap || !curtain) return;
-  curtain.style.left = scrollWrap.scrollLeft + "px";
+  if (!scrollWrap) return;
+  const left = scrollWrap.scrollLeft + "px";
+  document.querySelectorAll("#gantt .gantt-label-curtain, #gantt .gantt-label-curtain-header").forEach(c => { c.style.left = left; });
 }
 // 연도 라벨("2026년")을 각자 자기 구간 안에서만 스크롤에 맞춰 왼쪽으로 따라오게 함 — 구간이
 // 여러 달에 걸쳐 넓을 때도 항상 화면에 보이도록. 구간 경계를 넘어가면 그 구간의 오른쪽 끝에서 멈춤.
@@ -1553,8 +1556,11 @@ function buildGanttHtml(tasks, daypx, grouped = true, extendRange = false) {
 
   // 오늘선/월 경계선은 각 행의 고정(sticky) 라벨 배경으로 가려지는 구조라, 행과 행 사이의
   // 미세한 픽셀 틈(테두리 렌더링, 구분 그룹 헤더의 height:auto 등)에서 살짝 삐져나와 보일 수 있음.
-  // 행 하나하나가 완벽히 맞물리길 기대하는 대신, 라벨 폭만큼 통짜 배경 하나를 두 선보다 뒤(DOM 순서상)에
+  // 행 하나하나가 완벽히 맞물리길 기대하는 대신, 라벨 폭만큼 통짜 배경 두 장을 두 선보다 뒤(DOM 순서상)에
   // 깔아서 그 틈까지 통째로 가린다 (실제 라벨 내용은 z-index가 더 높아서 이 배경 위에 그대로 보임).
+  // 헤더(연도/월/날짜) 구간과 업무 목록 구간은 배경색이 서로 달라서 커튼도 두 구간으로 나눠 각자
+  // 맞는 색을 쓴다 — 높이는 JS(syncGanttCurtainTop)가 실측해서 정확히 나눠준다.
+  html += `<div class="gantt-label-curtain-header" style="width:${ganttLabelWidth}px"></div>`;
   html += `<div class="gantt-label-curtain" style="width:${ganttLabelWidth}px"></div>`;
   return html;
 }

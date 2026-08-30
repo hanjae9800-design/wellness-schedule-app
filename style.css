@@ -336,6 +336,7 @@ select.task-status-badge:disabled { cursor: default; opacity: .85; }
 .gantt-month-track { display: flex; flex: none; }
 .gantt-month-track span { flex: none; padding: 2px 4px; box-sizing: border-box; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; border-right: 1px dashed var(--border); }
 .gantt-month-line { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--border-strong); z-index: 1; pointer-events: none; }
+.gantt-label-curtain-header { position: absolute; top: 0; height: 0; left: 0; background: var(--surface); z-index: 1; pointer-events: none; }
 .gantt-label-curtain { position: absolute; top: 0; bottom: 0; left: 0; background: var(--surface-alt); z-index: 1; pointer-events: none; }
 .gantt-ruler { display: flex; font-size: 10.5px; color: var(--ink-muted); background: var(--surface); border-bottom: 1px solid var(--border-strong); padding-bottom: 10px; }
 .gantt-ruler-track { display: flex; flex: none; }
