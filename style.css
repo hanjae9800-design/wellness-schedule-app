@@ -187,7 +187,7 @@ h1.title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; font
 .legend-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; color: #fff; padding: 4px 9px; border-radius: 999px; }
 
 /* ---- desktop table ---- */
-.table-scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+.table-scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); }
 .task-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; color: var(--ink); }
 .task-table th { position: relative; text-align: center; font-size: 11.5px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.04em; padding: 10px 10px; border-bottom: 1px solid var(--border-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .task-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; overflow: hidden; }
@@ -305,7 +305,7 @@ select.task-status-badge:disabled { cursor: default; opacity: .85; }
 .gantt-phase-row .gantt-track { background: var(--surface-alt); }
 .gantt-group-bar { position: absolute; top: 50%; transform: translateY(-50%); height: 14px; border-radius: 5px; opacity: .55; }
 
-.gantt-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow-x: auto; overflow-y: hidden; padding: 14px 14px 14px 0; margin-bottom: 20px; }
+.gantt-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow-x: auto; overflow-y: hidden; padding: 14px 14px 14px 0; margin-bottom: 20px; box-shadow: var(--shadow); }
 .section-head { margin: 4px 0 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .today-filter-btn.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .section-head h2 { font-family: "Noto Serif KR", serif; font-size: 17px; font-weight: 700; }
