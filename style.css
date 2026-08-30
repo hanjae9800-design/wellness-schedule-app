@@ -131,9 +131,8 @@ button.secondary { background: var(--surface); border: 1px solid var(--border-st
   border-bottom: 1px solid var(--border-strong);
   box-shadow: var(--shadow);
 }
-/* 좌(뒤로가기·구분·제목) / 중앙(라이트·다크 모드) / 우(상태·편집모드) 3분할 — 가운데 버튼이 항상 바 정중앙에 오도록 양쪽을 동일한 flex:1로 둠 */
+/* 좌(라이트·다크 모드·뷰전환·뒤로가기·구분·제목) / 우(상태·편집모드) 2분할 */
 .top-bar .tb-left { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 12px; overflow: hidden; }
-.top-bar .tb-center { flex: none; display: flex; align-items: center; padding: 0 16px; }
 .top-bar .tb-right { flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
 .top-bar .tb-icon-btn { flex: none; width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border-strong); background: var(--surface-alt); color: var(--ink); font-size: 15px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .top-bar .tb-icon-btn:hover { border-color: var(--accent); }
@@ -151,8 +150,7 @@ button.secondary { background: var(--surface); border: 1px solid var(--border-st
 @media (max-width: 880px) {
   .top-bar { position: static; width: auto; height: auto; box-sizing: border-box; flex-wrap: wrap; white-space: normal; overflow: visible; padding: 14px 16px; margin: 14px 16px 0; border: 1px solid var(--border); border-radius: 12px; box-shadow: none; gap: 8px 0; }
   .top-bar .tb-left, .top-bar .tb-right { flex: 1 1 100%; overflow: visible; }
-  .top-bar .tb-center { flex: 1 1 100%; padding: 0; order: 2; }
-  .top-bar .tb-right { order: 3; justify-content: flex-start; flex-wrap: wrap; gap: 8px; }
+  .top-bar .tb-right { order: 2; justify-content: flex-start; flex-wrap: wrap; gap: 8px; }
   .top-bar .tb-icon-btn#viewNavToggleBtn, .top-bar .tb-sep { display: none; }
   .top-bar .tb-crumb-group, .top-bar .tb-crumb { width: 100%; }
   .top-bar .tb-title { font-size: 20px; }
