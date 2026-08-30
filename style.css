@@ -1,7 +1,7 @@
 :root {
   color-scheme: light;
   /* 바우하우스 포스터 톤 — 크림 바탕 + 원색(파랑·빨강·노랑·녹색) */
-  --page: #F0E6CC; --surface: #FFFCF3; --surface-alt: #ECE0BE;
+  --page: #F0E6CC; --surface: #FFFCF3; --surface-alt: #E1CF9A;
   --ink: #1A1712; --ink-2: #56504A; --ink-muted: #8F877A;
   --border: rgba(26,23,18,0.15); --border-strong: rgba(26,23,18,0.28);
   --accent: #1B4C9E; --accent-ink: #FFFFFF; --accent-warm: #DFA22E;
@@ -330,7 +330,7 @@ select.task-status-badge:disabled { cursor: default; opacity: .85; }
 .today-toggle-btn.off { color: var(--ink-muted); background: var(--surface-alt); border-color: var(--border-strong); }
 .gantt-month-row { display: flex; font-size: 12.5px; font-weight: 800; color: var(--ink); border-bottom: 1px solid var(--border); padding-bottom: 5px; margin-bottom: 2px; letter-spacing: .01em; }
 .gantt-month-track { display: flex; flex: none; }
-.gantt-month-track span { flex: none; padding: 2px 0 2px 6px; box-sizing: border-box; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-right: 1px dashed var(--border); }
+.gantt-month-track span { flex: none; padding: 2px 4px; box-sizing: border-box; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; border-right: 1px dashed var(--border); }
 .gantt-month-track span.alt { background: var(--surface-alt); }
 .gantt-month-line { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--border-strong); z-index: 1; pointer-events: none; }
 .gantt-label-curtain { position: absolute; top: 0; bottom: 0; left: 0; background: var(--surface-alt); z-index: 1; pointer-events: none; }
