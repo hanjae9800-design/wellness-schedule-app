@@ -27,7 +27,7 @@
   --ink: #F5F7F5; --ink-2: #C2C7C0; --ink-muted: #8B9088;
   --border: rgba(255,255,255,0.11); --border-strong: rgba(255,255,255,0.20);
   --accent: #4FB58C; --accent-ink: #08130E; --accent-warm: #E3A63C;
-  --delay: #c14545; --today: #f2984a;
+  --delay: #c14545; --today: #2dd4bf;
 }
 * { box-sizing: border-box; }
 body {
