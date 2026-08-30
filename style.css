@@ -303,7 +303,8 @@ select.task-status-badge:disabled { cursor: default; opacity: .85; }
 .gantt-phase-label .phase-group-dot { display: none; }
 .gantt-phase-label .phase-group-count { background: rgba(255,255,255,0.24); color: #fff; border-color: transparent; }
 
-.gantt-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow-x: auto; overflow-y: hidden; padding: 14px 14px 14px 0; margin-bottom: 20px; box-shadow: var(--shadow); }
+.panel-frame { background: var(--surface-alt); border: 1px solid var(--border-strong); border-radius: 18px; padding: 38px; box-sizing: border-box; margin-bottom: 20px; }
+.gantt-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow-x: auto; overflow-y: hidden; padding: 14px 14px 14px 0; box-shadow: var(--shadow); }
 .section-head { margin: 4px 0 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .today-filter-btn.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .section-head h2 { font-family: "Noto Serif KR", serif; font-size: 17px; font-weight: 700; }
