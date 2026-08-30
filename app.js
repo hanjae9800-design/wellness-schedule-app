@@ -77,19 +77,24 @@ function loadTheme() {
   return prefersDark ? "dark" : "light";
 }
 let currentTheme = loadTheme();
+const THEME_TOGGLE_IDS = ["themeToggleBtn", "themeToggleBtnBar"]; // 목록 화면용 고정 버튼 + 상세 화면 상단 바 안의 버튼
 function applyTheme() {
   document.documentElement.setAttribute("data-theme", currentTheme);
-  const btn = document.getElementById("themeToggleBtn");
-  if (btn) btn.textContent = currentTheme === "dark" ? "☀️" : "🌙";
+  THEME_TOGGLE_IDS.forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) btn.textContent = currentTheme === "dark" ? "☀️" : "🌙";
+  });
 }
 applyTheme();
 function wireThemeToggle() {
-  const btn = document.getElementById("themeToggleBtn");
-  if (!btn) return;
-  btn.addEventListener("click", () => {
-    currentTheme = currentTheme === "dark" ? "light" : "dark";
-    try { localStorage.setItem("theme", currentTheme); } catch (e) {}
-    applyTheme();
+  THEME_TOGGLE_IDS.forEach(id => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.addEventListener("click", () => {
+      currentTheme = currentTheme === "dark" ? "light" : "dark";
+      try { localStorage.setItem("theme", currentTheme); } catch (e) {}
+      applyTheme();
+    });
   });
 }
 wireThemeToggle();
@@ -198,6 +203,11 @@ function applyChecklistModeUI() {
   $("#pmSep").hidden = isChecklist;
   $("#teamChipRow").hidden = isChecklist;
   $("#teamAddBtn").hidden = isChecklist;
+  // 위 필드들이 전부 숨겨지면 상단 바의 "|" 구분선 사이가 텅 비어 보여서, 구분선까지 통째로 숨김
+  $("#tbCrumbGroup").hidden = isChecklist;
+  // 프로젝트 전체 진행상태(지연/예정 등)도 조직 단위 일정 개념이라 개인용 체크리스트에서는 불필요
+  $("#statusBadge").hidden = isChecklist;
+  $("#statusSelect").hidden = isChecklist;
   // 담당자 지정도 조직/팀 개념이라 체크리스트에서는 불필요 — 담당자 필터·현황 UI 숨김
   // ("담당자별 업무" 보기는 뷰 전환 버튼 자체가 이미 위에서 숨겨져 있어 별도 처리 불필요)
   $("#filterOwner").hidden = isChecklist;
@@ -452,6 +462,7 @@ async function enterProject(projectId) {
   state.editMode = state.project.mode === "edit";
   $("#app").hidden = false;
   $("#topBar").hidden = false;
+  $("#themeToggleBtn").hidden = true; // 상단 바 안의 themeToggleBtnBar가 대신함
   applyChecklistModeUI();
   renderAll();
   applyViewMode();
