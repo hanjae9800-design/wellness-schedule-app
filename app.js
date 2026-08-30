@@ -19,10 +19,12 @@ let collapsedOwnersTable = new Set();
 let viewMode = "all";
 // task ids whose "세부내용" (담당자/시작일/종료일/비고) row is expanded in the 업무 목록 table; session-only, not persisted.
 let openDetailRows = new Set();
-// task ids whose 세부업무(subtask) row is expanded (체크리스트 전용); session-only, not persisted.
+// task ids whose 세부업무(subtask) row is expanded; session-only, not persisted.
 let openSubtaskRows = new Set();
 // pointer-based row reorder tracking (threshold-based: a plain click never moves a row, only a real press-and-move does)
 let dragTracking = null;
+let groupDragTracking = null;
+let subtaskDragTracking = null;
 // 업무 체크리스트는 구글 로그인한 본인만 접근 가능; 로그인 안 했으면 null.
 let currentUser = null;
 
@@ -811,9 +813,11 @@ function buildPhaseGroupStatChipsHtml(g) {
 }
 function buildPhaseGroupHeaderRowHtml(g, collapsed) {
   const dotBtn = `<button type="button" class="phase-group-dot phase-group-dot-btn" style="background:${g.color || PALETTE[0]}" data-action="phase-color" data-phase="${escapeHtml(g.key)}" title="클릭하면 이 구분 전체 업무의 색을 바꿀 수 있어요" ${!state.editMode ? "disabled" : ""}></button>`;
+  const handleHtml = state.editMode ? `<span class="drag-handle group-drag-handle" title="드래그해서 구분 순서 변경">⠿</span>` : "";
   return `<tr class="phase-group-row" data-phase="${escapeHtml(g.key)}">
     <td colspan="5">
       <div class="phase-group-toggle-wrap">
+        ${handleHtml}
         ${dotBtn}
         <div class="phase-group-toggle" role="button" tabindex="0">${buildPhaseHeaderInnerHtml(g, collapsed, false, true)}</div>
         ${buildPhaseGroupStatChipsHtml(g)}
@@ -869,19 +873,18 @@ function buildOwnerGroupHeaderRowHtml(g, collapsed) {
 function buildTaskRowHtml(t, dis) {
   const ts = deriveTaskStatus(t);
   const open = openDetailRows.has(t.id);
-  const isChecklist = state.project && state.project.type === "checklist";
-  const subtasks = isChecklist ? parseSubtasks(t.subtasks) : [];
+  const subtasks = parseSubtasks(t.subtasks);
   const subOpen = openSubtaskRows.has(t.id);
   return `
     <tr data-id="${t.id}">
       <td class="col-drag"><span class="drag-handle">⠿</span></td>
-      <td class="col-name">${isChecklist ? `<button type="button" class="task-subtask-caret-btn ${subOpen ? "open" : ""}" data-action="subtask-toggle" data-id="${t.id}" aria-label="세부업무 펼치기"><span class="task-subtask-caret">▾</span></button>` : ""}<input value="${escapeHtml(t.name)}" data-field="name" data-id="${t.id}" ${dis} placeholder="업무명">${subtasks.length ? `<span class="task-subtask-badge">${subtasks.filter(s => s.done).length}/${subtasks.length}</span>` : ""}</td>
+      <td class="col-name"><button type="button" class="task-subtask-caret-btn ${subOpen ? "open" : ""}" data-action="subtask-toggle" data-id="${t.id}" aria-label="세부업무 펼치기"><span class="task-subtask-caret">▾</span></button><input value="${escapeHtml(t.name)}" data-field="name" data-id="${t.id}" ${dis} placeholder="업무명">${subtasks.length ? `<span class="task-subtask-badge">${subtasks.filter(s => s.done).length}/${subtasks.length}</span>` : ""}</td>
       <td class="col-taskstatus">${buildTaskStatusSelectHtml(t, ts, dis)}</td>
       <td class="col-detail"><button type="button" class="detail-btn ${open ? "open" : ""}" data-action="detail" data-id="${t.id}"><span class="detail-car">▾</span> 세부내용</button></td>
       <td class="col-del">${state.editMode ? `<button class="del-btn" data-action="del" data-id="${t.id}">✕</button>` : ""}</td>
     </tr>
     ${buildTaskDetailRowHtml(t, dis, open)}
-    ${isChecklist ? buildTaskSubtaskRowHtml(t, subOpen) : ""}
+    ${buildTaskSubtaskRowHtml(t, subOpen)}
   `;
 }
 function buildTaskDetailRowHtml(t, dis, open) {
@@ -950,6 +953,7 @@ function buildSubtaskSectionHtml(t) {
   const doneCount = list.filter(s => s.done).length;
   const itemsHtml = list.map(s => `
     <div class="subtask-row" data-sub-id="${s.id}">
+      ${!dis ? `<span class="drag-handle subtask-drag-handle" title="드래그해서 세부업무 순서 변경">⠿</span>` : ""}
       <input type="checkbox" class="subtask-check" data-id="${t.id}" data-sub-id="${s.id}" ${s.done ? "checked" : ""} ${dis ? "disabled" : ""}>
       <input type="text" class="subtask-name-input${s.done ? " done" : ""}" value="${escapeHtml(s.name)}" data-id="${t.id}" data-sub-id="${s.id}" ${dis ? "disabled" : ""}>
       ${!dis ? `<button type="button" class="subtask-del-btn" data-id="${t.id}" data-sub-id="${s.id}" aria-label="삭제">✕</button>` : ""}
@@ -983,6 +987,23 @@ function wireSubtaskSection(root) {
       addSubtask(inp.dataset.id, name);
     });
   });
+  root.querySelectorAll(".subtask-drag-handle").forEach(handle => {
+    handle.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      const row = handle.closest(".subtask-row");
+      const section = handle.closest(".subtask-section");
+      subtaskDragTracking = { taskId: section.dataset.id, row, startX: e.clientX, startY: e.clientY, dragging: false };
+    });
+  });
+}
+function persistSubtaskOrder(taskId) {
+  const section = document.querySelector(`.subtask-section[data-id="${taskId}"]`);
+  const t = state.tasks.find(x => x.id === taskId);
+  if (!section || !t) return;
+  const idsInOrder = Array.from(section.querySelectorAll(".subtask-row")).map(r => r.dataset.subId);
+  const list = parseSubtasks(t.subtasks);
+  list.sort((a, b) => idsInOrder.indexOf(a.id) - idsInOrder.indexOf(b.id));
+  updateTaskField(taskId, "subtasks", JSON.stringify(list));
 }
 function refreshSubtaskSection(taskId) {
   const t = state.tasks.find(x => x.id === taskId);
@@ -1203,7 +1224,7 @@ function renderTable() {
   ` : "");
 
   tbody.querySelectorAll("tr[data-id]").forEach(wireTaskRowEl);
-  if (byOwner) { wireOwnerToggles(tbody); } else { wirePhaseToggles(tbody, "table"); wirePhaseColorDots(tbody); wirePhaseNameEdit(tbody); wirePhaseStatChips(tbody); }
+  if (byOwner) { wireOwnerToggles(tbody); } else { wirePhaseToggles(tbody, "table"); wirePhaseColorDots(tbody); wirePhaseNameEdit(tbody); wirePhaseStatChips(tbody); wireGroupDragReorder(tbody); }
   const addBtn = tbody.querySelector("#addTaskBtnDesktop");
   if (addBtn) addBtn.addEventListener("click", addTask);
   wireDragReorder(tbody);
@@ -1216,14 +1237,35 @@ function renderTable() {
 // task-detail-row travels along with it as a pair, never dropped on independently.
 const DRAG_THRESHOLD = 6;
 function wireDragReorder(tbody) {
-  const isChecklist = state.project && state.project.type === "checklist";
   tbody.querySelectorAll("tr[data-id]:not(.task-detail-row):not(.task-subtask-row)").forEach(row => {
     row.addEventListener("pointerdown", (e) => {
       if (e.target.matches('input[data-field="name"]') || e.target.closest('.task-subtask-caret-btn')) return;
       if (e.button !== 0) return;
       const detailEl = tbody.querySelector(`tr.task-detail-row[data-id="${row.dataset.id}"]`);
-      const subtaskEl = isChecklist ? tbody.querySelector(`tr.task-subtask-row[data-id="${row.dataset.id}"]`) : null;
+      const subtaskEl = tbody.querySelector(`tr.task-subtask-row[data-id="${row.dataset.id}"]`);
       dragTracking = { row, detailEl, subtaskEl, startX: e.clientX, startY: e.clientY, dragging: false };
+    });
+  });
+}
+
+// 구분(phase) 그룹 헤더 행부터, 다음 그룹 헤더(또는 "+ 업무 추가" 행) 바로 앞까지의 모든 행이
+// 그 구분에 속한 한 덩어리 — 렌더링할 때 항상 이렇게 연속으로 나오기 때문에 (renderTable 참고)
+// 이 범위만큼만 훑으면 그 구분의 전체 행을 모을 수 있다.
+function getPhaseGroupBlockRows(headerRow) {
+  const rows = [headerRow];
+  let el = headerRow.nextElementSibling;
+  while (el && !el.classList.contains("phase-group-row") && !el.classList.contains("add-task-row")) {
+    rows.push(el);
+    el = el.nextElementSibling;
+  }
+  return rows;
+}
+function wireGroupDragReorder(tbody) {
+  tbody.querySelectorAll(".phase-group-row .group-drag-handle").forEach(handle => {
+    handle.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      const headerRow = handle.closest(".phase-group-row");
+      groupDragTracking = { headerRow, blockRows: getPhaseGroupBlockRows(headerRow), startX: e.clientX, startY: e.clientY, dragging: false };
     });
   });
 }
@@ -1676,6 +1718,64 @@ function wireStaticUI() {
     }
     dragTracking = null;
   });
+
+  // 구분(phase) 그룹 통째로 드래그해서 순서 바꾸기 — 위 업무 행 드래그와 같은 threshold 방식,
+  // 다만 그룹 헤더 위에 커서가 있을 때만 반응하고(헤더가 아닌 그 그룹 소속 업무 행 위는 무시),
+  // 그 그룹에 속한 행 전체(getPhaseGroupBlockRows)를 한 덩어리로 옮긴다.
+  document.addEventListener("pointermove", (e) => {
+    if (!groupDragTracking) return;
+    if (!groupDragTracking.dragging) {
+      const moved = Math.hypot(e.clientX - groupDragTracking.startX, e.clientY - groupDragTracking.startY);
+      if (moved < DRAG_THRESHOLD) return;
+      groupDragTracking.dragging = true;
+      groupDragTracking.blockRows.forEach(r => r.classList.add("dragging"));
+    }
+    const overHeader = document.elementFromPoint(e.clientX, e.clientY)?.closest(".phase-group-row");
+    if (!overHeader || overHeader === groupDragTracking.headerRow) return;
+    const rect = overHeader.getBoundingClientRect();
+    const before = (e.clientY - rect.top) < rect.height / 2;
+    const targetBlockRows = getPhaseGroupBlockRows(overHeader);
+    const anchor = before ? overHeader : targetBlockRows[targetBlockRows.length - 1].nextSibling;
+    groupDragTracking.blockRows.forEach(r => overHeader.parentNode.insertBefore(r, anchor));
+  });
+  document.addEventListener("pointerup", () => {
+    if (!groupDragTracking) return;
+    if (groupDragTracking.dragging) {
+      groupDragTracking.blockRows.forEach(r => r.classList.remove("dragging"));
+      const tbody = $("#taskTbody");
+      const ids = Array.from(tbody.querySelectorAll("tr[data-id]:not(.task-detail-row):not(.task-subtask-row)")).map(r => r.dataset.id);
+      state.tasks.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+      persistOrder();
+    }
+    groupDragTracking = null;
+  });
+
+  // 세부업무(subtask) 행 드래그 — 같은 업무의 세부업무 목록 안에서만 순서 변경.
+  document.addEventListener("pointermove", (e) => {
+    if (!subtaskDragTracking) return;
+    if (!subtaskDragTracking.dragging) {
+      const moved = Math.hypot(e.clientX - subtaskDragTracking.startX, e.clientY - subtaskDragTracking.startY);
+      if (moved < DRAG_THRESHOLD) return;
+      subtaskDragTracking.dragging = true;
+      subtaskDragTracking.row.classList.add("dragging");
+    }
+    const overEl = document.elementFromPoint(e.clientX, e.clientY);
+    const overRow = overEl?.closest(".subtask-row");
+    const overSection = overEl?.closest(".subtask-section");
+    if (!overRow || overRow === subtaskDragTracking.row || !overSection || overSection.dataset.id !== subtaskDragTracking.taskId) return;
+    const rect = overRow.getBoundingClientRect();
+    const before = (e.clientY - rect.top) < rect.height / 2;
+    overRow.parentNode.insertBefore(subtaskDragTracking.row, before ? overRow : overRow.nextSibling);
+  });
+  document.addEventListener("pointerup", () => {
+    if (!subtaskDragTracking) return;
+    if (subtaskDragTracking.dragging) {
+      subtaskDragTracking.row.classList.remove("dragging");
+      persistSubtaskOrder(subtaskDragTracking.taskId);
+    }
+    subtaskDragTracking = null;
+  });
+
   const wireFilterPair = (key, ids) => {
     ids.forEach(id => {
       const el = $(id);
