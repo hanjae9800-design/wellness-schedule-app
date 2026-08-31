@@ -8,14 +8,12 @@ const PALETTE = Array.from({ length: 10 }, (_, i) => getComputedStyle(document.d
 const STATUS_LABEL = { todo: "예정", doing: "진행중", done: "완료" };
 const DAYPX = 20;
 
-// 구분(phase) 색을 기준으로 업무/세부업무 행에 옅게 우려낸 색조를 입혀서 3단 구조(구분 > 업무 > 세부업무)가
-// 한눈에 통일감 있게 이어져 보이게 함 — 아래로 내려갈수록 더 옅어짐. color-mix로 그때그때 계산해서
-// 구분마다 색이 달라도(팔레트 10색 전부) 별도 사전 계산 없이 항상 정확히 맞는 색을 만든다.
+// 구분(phase)마다 다른 색을 쓰던 걸 없애고 전체를 화이트&블랙 톤으로 정리하면서, 업무/세부업무 행에
+// 입히던 "구분 색 우려낸 옅은 색조"도 전부 단일 회색(--phase)을 우려내는 걸로 통일함 — 아래로 내려갈수록 더 옅어짐.
 const TASK_TINT_PCT = 16;
 const SUBTASK_TINT_PCT = 8;
-function phaseTintCss(phaseColor, pct) {
-  const color = phaseColor || PALETTE[0];
-  return `color-mix(in srgb, ${color} ${pct}%, var(--surface))`;
+function phaseTintCss(pct) {
+  return `color-mix(in srgb, var(--phase) ${pct}%, var(--surface))`;
 }
 
 let state = { project: null, tasks: [], editMode: false, weeklyGoals: [], checkItems: [] };
@@ -760,8 +758,8 @@ function renderOwnerSummary() {
   }).join("");
 }
 function renderLegend() {
-  const phases = [...new Map(state.tasks.map(t => [t.phase_name, t.phase_color])).entries()];
-  const html = phases.map(([name, color]) => `<span class="legend-chip" style="background:${color}">${escapeHtml(name || "구분")}</span>`).join("");
+  const phases = [...new Set(state.tasks.map(t => t.phase_name))];
+  const html = phases.map(name => `<span class="legend-chip">${escapeHtml(name || "구분")}</span>`).join("");
   $("#legendDesktop").innerHTML = html;
   $("#legendMobile").innerHTML = html;
 }
@@ -824,13 +822,6 @@ function wirePhaseToggles(container, view) {
     btn.addEventListener("click", () => togglePhase(holder.dataset.phase, view));
   });
 }
-function wirePhaseColorDots(container) {
-  container.querySelectorAll(".phase-group-dot-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      if (state.editMode) openPhaseColorPicker(btn, btn.dataset.phase);
-    });
-  });
-}
 function wirePhaseStatChips(container) {
   container.querySelectorAll(".phase-group-stat-chip").forEach(chip => {
     chip.addEventListener("click", (e) => {
@@ -879,7 +870,7 @@ function renamePhaseGroup(oldKey, newKey) {
 function buildPhaseHeaderInnerHtml(g, collapsed, showDot = true, nameEditable = false) {
   const total = g.tasks.length;
   const done = g.tasks.filter(t => deriveTaskStatus(t).key === "done").length;
-  const dotHtml = showDot ? `<span class="phase-group-dot" style="background:${g.color || PALETTE[0]}"></span>` : "";
+  const dotHtml = showDot ? `<span class="phase-group-dot"></span>` : "";
   const nameHtml = nameEditable
     ? `<span class="phase-group-name phase-group-name-editable" data-phase="${escapeHtml(g.key)}" title="클릭하면 이름을 바꿀 수 있어요">${escapeHtml(g.key || "구분")}</span>`
     : `<span class="phase-group-name">${escapeHtml(g.key || "구분")}</span>`;
@@ -901,13 +892,12 @@ function buildPhaseGroupStatChipsHtml(g) {
   </span>`;
 }
 function buildPhaseGroupHeaderRowHtml(g, collapsed) {
-  const dotBtn = `<button type="button" class="phase-group-dot phase-group-dot-btn" style="background:${g.color || PALETTE[0]}" data-action="phase-color" data-phase="${escapeHtml(g.key)}" title="클릭하면 이 구분 전체 업무의 색을 바꿀 수 있어요" ${!state.editMode ? "disabled" : ""}></button>`;
   const handleHtml = state.editMode ? `<span class="drag-handle group-drag-handle" title="드래그해서 구분 순서 변경">⠿</span>` : "";
   return `<tr class="phase-group-row" data-phase="${escapeHtml(g.key)}">
     <td colspan="5">
       <div class="phase-group-toggle-wrap">
         ${handleHtml}
-        ${dotBtn}
+        <span class="phase-group-dot"></span>
         <div class="phase-group-toggle" role="button" tabindex="0">${buildPhaseHeaderInnerHtml(g, collapsed, false, true)}</div>
         ${buildPhaseGroupStatChipsHtml(g)}
       </div>
@@ -965,7 +955,7 @@ function buildTaskRowHtml(t, dis) {
   const subtasks = parseSubtasks(t.subtasks);
   const subOpen = openSubtaskRows.has(t.id);
   return `
-    <tr data-id="${t.id}" style="background:${phaseTintCss(t.phase_color, TASK_TINT_PCT)}">
+    <tr data-id="${t.id}" style="background:${phaseTintCss(TASK_TINT_PCT)}">
       <td class="col-drag"><span class="drag-handle">⠿</span></td>
       <td class="col-name"><button type="button" class="task-subtask-caret-btn ${subOpen ? "open" : ""}" data-action="subtask-toggle" data-id="${t.id}" aria-label="세부업무 펼치기"><span class="task-subtask-caret">▾</span></button><input value="${escapeHtml(t.name)}" data-field="name" data-id="${t.id}" ${dis} placeholder="업무명">${subtasks.length ? `<span class="task-subtask-badge">${subtasks.filter(s => s.done).length}/${subtasks.length}</span>` : ""}</td>
       <td class="col-taskstatus">${buildTaskStatusSelectHtml(t, ts, dis)}</td>
@@ -1041,7 +1031,7 @@ function buildSubtaskSectionHtml(t) {
   const list = parseSubtasks(t.subtasks);
   const dis = !state.editMode;
   const doneCount = list.filter(s => s.done).length;
-  const subtaskTint = phaseTintCss(t.phase_color, SUBTASK_TINT_PCT);
+  const subtaskTint = phaseTintCss(SUBTASK_TINT_PCT);
   const itemsHtml = list.map(s => `
     <div class="subtask-row" data-sub-id="${s.id}" style="background:${subtaskTint}">
       ${!dis ? `<span class="drag-handle subtask-drag-handle" title="드래그해서 세부업무 순서 변경">⠿</span>` : ""}
@@ -1327,7 +1317,7 @@ function renderTable() {
   ` : "");
 
   tbody.querySelectorAll("tr[data-id]").forEach(wireTaskRowEl);
-  if (byOwner) { wireOwnerToggles(tbody); } else { wirePhaseToggles(tbody, "table"); wirePhaseColorDots(tbody); wirePhaseNameEdit(tbody); wirePhaseStatChips(tbody); wireGroupDragReorder(tbody); }
+  if (byOwner) { wireOwnerToggles(tbody); } else { wirePhaseToggles(tbody, "table"); wirePhaseNameEdit(tbody); wirePhaseStatChips(tbody); wireGroupDragReorder(tbody); }
   const addBtn = tbody.querySelector("#addTaskBtnDesktop");
   if (addBtn) addBtn.addEventListener("click", addTask);
   wireDragReorder(tbody);
@@ -1516,7 +1506,7 @@ function buildGanttTaskRowHtml(t, minDate, daypx, trackWidth, rowWidth) {
   const off = daysBetween(minDate, t.start_date);
   const len = Math.max(1, daysBetween(t.start_date, t.end_date) + 1);
   const ts = deriveTaskStatus(t);
-  let barColor = t.phase_color;
+  let barColor = "var(--phase)";
   if (ts.key === "delayed") barColor = "var(--delay)";
   else if (ts.key === "done") barColor = "var(--ink-muted)";
   else if (ts.key === "doing") barColor = "var(--accent)";
@@ -1524,7 +1514,7 @@ function buildGanttTaskRowHtml(t, minDate, daypx, trackWidth, rowWidth) {
   const barWidth = len * daypx - 3;
   const labelHtml = ts.key === "todo" ? "" : `<span class="gantt-bar-label">${ts.label}</span>`;
   const ownerText = t.owner ? escapeHtml(t.owner) : "미배정";
-  const rowTint = phaseTintCss(t.phase_color, TASK_TINT_PCT);
+  const rowTint = phaseTintCss(TASK_TINT_PCT);
   return `<div class="gantt-row" style="grid-template-columns:${ganttLabelWidth}px 1fr;width:${rowWidth}px">
     <div class="gantt-row-label" style="background:${rowTint}">
       <div class="gantt-row-name-box" title="${escapeHtml(t.phase_name || "구분")} · ${escapeHtml(t.name || "")}">${escapeHtml(t.name || "(제목 없음)")}</div>
@@ -1601,7 +1591,7 @@ function buildGanttHtml(tasks, daypx, grouped = true, extendRange = false) {
     const groups = groupTasksByPhase(tasks);
     groups.forEach(g => {
       const collapsed = isPhaseCollapsed(g.key, "gantt");
-      const groupColor = g.color || PALETTE[0];
+      const groupColor = "var(--phase)";
       // 구분 행은 라벨과 날짜 트랙을 나누지 않고 한 가지 색으로 통째로 병합 — 예전엔 트랙 쪽에
       // 그 구분 업무들 날짜 범위만 옅게 칠한 막대(group-bar)를 따로 얹었는데, 행 전체가 이제
       // 같은 색이라 그 막대는 의미가 없어져서 뺐다.
@@ -1712,7 +1702,7 @@ function buildFolderTaskRow(t, range, phaseColor, dis) {
   const isChecklist = state.project && state.project.type === "checklist";
   const doneCount = subs.filter(s => s.done).length;
   return `
-    <div class="task-block${subOpen ? " open" : ""}${detailOpen ? " detail-open" : ""}" data-id="${t.id}" style="background:${phaseTintCss(t.phase_color, TASK_TINT_PCT)}">
+    <div class="task-block${subOpen ? " open" : ""}${detailOpen ? " detail-open" : ""}" data-id="${t.id}" style="background:${phaseTintCss(TASK_TINT_PCT)}">
       <div class="task-row">
         <span class="grip" title="드래그해서 순서 변경">⠿</span>
         <button type="button" class="sub-caret-btn${subOpen ? " open" : ""}" data-action="fld-sub-toggle" data-id="${t.id}" ${canToggleSubs ? "" : `disabled tabindex="-1"`}><span class="sc">▾</span></button>
@@ -1897,7 +1887,7 @@ function renderFolder() {
   const dis = !state.editMode ? "disabled" : "";
   stack.innerHTML = groups.map(g => {
     const isOpen = openFolderPhase === g.key;
-    const color = g.color || PALETTE[0];
+    const color = "var(--phase)";
     return `
     <div class="sheet${isOpen ? " open" : ""}" data-phase="${escapeHtml(g.key)}">
       <button type="button" class="sheet-tab" style="background:${color}" data-action="fld-tab" data-phase="${escapeHtml(g.key)}">
@@ -2111,7 +2101,7 @@ function buildTaskCardHtml(t, idx, dis) {
   return `
     <div class="task-card" data-id="${t.id}">
       <div class="card-top">
-        <span class="phase-pill" style="background:${t.phase_color}" data-action="color" data-id="${t.id}" title="클릭하면 색상을 바꿀 수 있어요">
+        <span class="phase-pill">
           <input value="${escapeHtml(t.phase_name)}" data-field="phase_name" data-id="${t.id}" ${dis}>
         </span>
         ${buildTaskStatusSelectHtml(t, ts, dis)}
@@ -2148,10 +2138,6 @@ function wireTaskCardEl(card) {
   card.querySelectorAll('[data-action="del"]').forEach(el => el.addEventListener("click", () => deleteTask(el.dataset.id)));
   card.querySelectorAll('[data-action="up"]').forEach(el => el.addEventListener("click", () => moveTask(el.dataset.id, -1)));
   card.querySelectorAll('[data-action="down"]').forEach(el => el.addEventListener("click", () => moveTask(el.dataset.id, 1)));
-  card.querySelectorAll('[data-action="color"]').forEach(el => el.addEventListener("click", (e) => {
-    if (e.target.tagName === "INPUT") return;
-    if (state.editMode) openColorPicker(el, el.dataset.id);
-  }));
 }
 function patchTaskCard(taskId) {
   const idx = state.tasks.findIndex(x => x.id === taskId);
@@ -2180,42 +2166,8 @@ function renderCards() {
   applyTaskFilters();
 }
 
-// ---------- color picker ----------
-function openColorPickerCore(anchorEl, currentColor, onSelect) {
-  const picker = $("#colorPicker");
-  const rect = anchorEl.getBoundingClientRect();
-  const pickerHeight = 90;
-  let top = rect.bottom + 6;
-  if (top + pickerHeight > window.innerHeight) top = Math.max(8, rect.top - pickerHeight - 6);
-  picker.style.top = top + "px";
-  picker.style.left = Math.min(rect.left, window.innerWidth - 220) + "px";
-  picker.innerHTML = PALETTE.map(c => `<span class="color-swatch ${c === currentColor ? "selected" : ""}" style="background:${c}" data-color="${c}"></span>`).join("");
-  picker.hidden = false;
-  picker.querySelectorAll(".color-swatch").forEach(sw => {
-    sw.addEventListener("click", () => {
-      picker.hidden = true;
-      onSelect(sw.dataset.color);
-    });
-  });
-  const closeOnOutside = (e) => {
-    if (!picker.contains(e.target)) { picker.hidden = true; document.removeEventListener("click", closeOnOutside, true); }
-  };
-  setTimeout(() => document.addEventListener("click", closeOnOutside, true), 0);
-}
-function openColorPicker(anchorEl, taskId) {
-  const current = state.tasks.find(t => t.id === taskId)?.phase_color;
-  openColorPickerCore(anchorEl, current, (color) => {
-    updateTaskField(taskId, "phase_color", color);
-    renderAll();
-  });
-}
-function openPhaseColorPicker(anchorEl, phaseKey) {
-  const groupTasks = state.tasks.filter(t => phaseKeyOf(t.phase_name) === phaseKey);
-  openColorPickerCore(anchorEl, groupTasks[0]?.phase_color, (color) => {
-    groupTasks.forEach(t => updateTaskField(t.id, "phase_color", color));
-    renderAll();
-  });
-}
+// 색상 선택 기능(구분/업무별로 다른 색 지정)은 폐지 — 이제 구분은 전부 --phase 단일 회색으로만 표시됨.
+// phase_color 필드 자체는 DB에 남아있고 생성 시 계속 채워 넣지만(PALETTE, 아래), 화면에는 더 이상 쓰이지 않음.
 
 // ---------- task table column resize ----------
 const COL_WIDTH_KEY = "taskTableColWidths";
