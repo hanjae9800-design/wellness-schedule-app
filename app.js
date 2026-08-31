@@ -18,15 +18,24 @@ function phaseTintCss(phaseColor, pct) {
   return `color-mix(in srgb, ${color} ${pct}%, var(--surface))`;
 }
 
-let state = { project: null, tasks: [], editMode: false };
+let state = { project: null, tasks: [], editMode: false, weeklyGoals: [], checkItems: [] };
 let saveTimers = new Map();
 let taskFilters = { phase: "", status: "", owner: "", today: false };
 // gantt and table collapse state are independent: collapsing a 구분 in one view doesn't affect the other.
+// (간트차트/업무 목록 단독 보기는 더 이상 데스크톱에서 안 쓰지만, 모바일 타임라인 오버레이가 여전히
+// buildGanttHtml을 그대로 쓰고 있어서 관련 함수·상태는 남겨둠)
 let collapsedPhasesGantt = new Set();
 let collapsedPhasesTable = new Set();
 let collapsedOwnersTable = new Set();
-// which desktop board section is showing: "all" | "gantt" | "table" | "owner" (담당자별 업무)
-let viewMode = "all";
+// which desktop board section is showing: "folder" (구분 폴더 탭 — 간트+업무 목록 통합) | "owner" (담당자별 업무)
+let viewMode = "folder";
+// 폴더 탭: 한 번에 하나의 구분만 펼쳐짐(서류 파일철 컨셉) — 열려있는 구분 key, 없으면 null
+let openFolderPhase = null;
+// 폴더 뷰에서 세부업무/세부내용이 펼쳐진 업무 id들 — 세션 한정, 저장 안 함
+let openFolderSubtasks = new Set();
+let openFolderDetails = new Set();
+let folderDragTracking = null; // 폴더 뷰: 같은 구분 안에서 업무 행 순서 변경
+let folderSubDragTracking = null; // 폴더 뷰: 세부업무 순서 변경
 // task ids whose "세부내용" (담당자/시작일/종료일/비고) row is expanded in the 업무 목록 table; session-only, not persisted.
 let openDetailRows = new Set();
 // task ids whose 세부업무(subtask) row is expanded; session-only, not persisted.
@@ -456,9 +465,10 @@ async function enterProject(projectId) {
   collapsedPhasesGantt = loadCollapsedPhases(state.project.id, "gantt");
   collapsedPhasesTable = loadCollapsedPhases(state.project.id, "table");
   collapsedOwnersTable = loadCollapsedOwners(state.project.id);
-  viewMode = state.project.type === "checklist" ? "all" : loadViewMode(state.project.id);
+  viewMode = state.project.type === "checklist" ? "folder" : loadViewMode(state.project.id);
+  openFolderPhase = loadOpenFolderPhase(state.project.id);
   logPageView("project", projectId);
-  await loadTasks();
+  await Promise.all([loadTasks(), loadWeeklyGoals(), loadCheckItems()]);
   state.editMode = state.project.mode === "edit";
   $("#app").hidden = false;
   $("#topBar").hidden = false;
@@ -471,6 +481,7 @@ async function enterProject(projectId) {
   wireModeToggle();
   wireViewNav();
   wireFileImportDragDrop();
+  wireSidebar();
   subscribeRealtime();
 }
 
@@ -504,6 +515,18 @@ async function loadTasks() {
   if (error) { console.error(error); return; }
   state.tasks = data || [];
 }
+async function loadWeeklyGoals() {
+  if (!state.project) return;
+  const { data, error } = await supabase.from("weekly_goals").select("*").eq("project_id", state.project.id).order("sort_order", { ascending: true });
+  if (error) { console.error(error); state.weeklyGoals = []; return; } // 테이블이 아직 없으면(마이그레이션 전) 조용히 빈 목록으로
+  state.weeklyGoals = data || [];
+}
+async function loadCheckItems() {
+  if (!state.project) return;
+  const { data, error } = await supabase.from("check_items").select("*").eq("project_id", state.project.id).order("sort_order", { ascending: true });
+  if (error) { console.error(error); state.checkItems = []; return; }
+  state.checkItems = data || [];
+}
 
 function subscribeRealtime() {
   if (!state.project) return;
@@ -516,6 +539,18 @@ function subscribeRealtime() {
     .on("postgres_changes", { event: "UPDATE", schema: "public", table: "projects", filter: `id=eq.${state.project.id}` }, (payload) => {
       state.project = { ...state.project, ...payload.new };
       renderHeader();
+    })
+    .subscribe();
+  // weekly_goals/check_items 테이블이 아직 없으면(마이그레이션 전) 이 구독은 그냥 아무 이벤트도 못 받을 뿐,
+  // 에러로 앱이 죽지는 않음.
+  supabase.channel("weekly-goals-changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "weekly_goals", filter: `project_id=eq.${state.project.id}` }, (payload) => {
+      applyRemoteGoalChange(payload);
+    })
+    .subscribe();
+  supabase.channel("check-items-changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "check_items", filter: `project_id=eq.${state.project.id}` }, (payload) => {
+      applyRemoteCheckChange(payload);
     })
     .subscribe();
 }
@@ -544,6 +579,8 @@ function applyRemoteTaskChange(payload) {
   renderOwnerSummary();
   renderLegend();
   renderGantt();
+  renderFolder();
+  renderTodayList();
 }
 
 // ---------- save helpers ----------
@@ -609,6 +646,8 @@ function renderAll() {
   renderTable();
   renderGantt();
   renderCards();
+  renderFolder();
+  renderSidebar();
 }
 function refreshTaskDerivedViews() {
   renderStats();
@@ -616,6 +655,8 @@ function refreshTaskDerivedViews() {
   renderTable();
   renderGantt();
   renderCards();
+  renderFolder();
+  renderTodayList();
 }
 function renderHeader() {
   const p = state.project;
@@ -754,6 +795,16 @@ function saveCollapsedPhases(view) {
   const set = view === "gantt" ? collapsedPhasesGantt : collapsedPhasesTable;
   try { localStorage.setItem(`collapsedPhases_${view}_${state.project.id}`, JSON.stringify([...set])); } catch (e) {}
 }
+function loadOpenFolderPhase(pid) {
+  try { return localStorage.getItem(`openFolderPhase_${pid}`) || null; } catch (e) { return null; }
+}
+function saveOpenFolderPhase() {
+  if (!state.project) return;
+  try {
+    if (openFolderPhase) localStorage.setItem(`openFolderPhase_${state.project.id}`, openFolderPhase);
+    else localStorage.removeItem(`openFolderPhase_${state.project.id}`);
+  } catch (e) {}
+}
 function togglePhase(key, view) {
   const set = view === "gantt" ? collapsedPhasesGantt : collapsedPhasesTable;
   if (set.has(key)) set.delete(key);
@@ -822,6 +873,7 @@ function renamePhaseGroup(oldKey, newKey) {
   [["table", collapsedPhasesTable], ["gantt", collapsedPhasesGantt]].forEach(([view, set]) => {
     if (set.has(oldKey)) { set.delete(oldKey); set.add(newKey); saveCollapsedPhases(view); }
   });
+  if (openFolderPhase === oldKey) { openFolderPhase = newKey; saveOpenFolderPhase(); }
   refreshTaskDerivedViews();
 }
 function buildPhaseHeaderInnerHtml(g, collapsed, showDot = true, nameEditable = false) {
@@ -1044,6 +1096,15 @@ function persistSubtaskOrder(taskId) {
   list.sort((a, b) => idsInOrder.indexOf(a.id) - idsInOrder.indexOf(b.id));
   updateTaskField(taskId, "subtasks", JSON.stringify(list));
 }
+function persistFolderSubtaskOrder(taskId) {
+  const list = document.querySelector(`.sub-list[data-id="${taskId}"]`);
+  const t = state.tasks.find(x => x.id === taskId);
+  if (!list || !t) return;
+  const idsInOrder = Array.from(list.querySelectorAll(".sub-row")).map(r => r.dataset.subId);
+  const subs = parseSubtasks(t.subtasks);
+  subs.sort((a, b) => idsInOrder.indexOf(a.id) - idsInOrder.indexOf(b.id));
+  updateTaskField(taskId, "subtasks", JSON.stringify(subs));
+}
 function refreshSubtaskSection(taskId) {
   const t = state.tasks.find(x => x.id === taskId);
   const el = document.querySelector(`.subtask-section[data-id="${taskId}"]`);
@@ -1059,6 +1120,7 @@ function addSubtask(taskId, name) {
   list.push({ id: crypto.randomUUID(), name, done: false });
   updateTaskField(taskId, "subtasks", JSON.stringify(list));
   refreshSubtaskSection(taskId);
+  refreshFolderSubtaskList(taskId); // 옛 표(숨김)와 새 폴더 뷰 둘 다 이 함수들을 공유해서 씀 — 각자 자기 쪽 DOM만 있으면 갱신, 없으면 조용히 무시됨
 }
 function toggleSubtask(taskId, subId) {
   const t = state.tasks.find(x => x.id === taskId);
@@ -1069,6 +1131,7 @@ function toggleSubtask(taskId, subId) {
   s.done = !s.done;
   updateTaskField(taskId, "subtasks", JSON.stringify(list));
   refreshSubtaskSection(taskId);
+  refreshFolderSubtaskList(taskId);
 }
 function renameSubtask(taskId, subId, name) {
   const t = state.tasks.find(x => x.id === taskId);
@@ -1085,6 +1148,7 @@ function deleteSubtask(taskId, subId) {
   const list = parseSubtasks(t.subtasks).filter(x => x.id !== subId);
   updateTaskField(taskId, "subtasks", JSON.stringify(list));
   refreshSubtaskSection(taskId);
+  refreshFolderSubtaskList(taskId);
 }
 function openDependencyPicker(anchorEl, taskId) {
   const picker = $("#depPicker");
@@ -1583,6 +1647,446 @@ function buildGanttHtml(tasks, daypx, grouped = true, extendRange = false) {
   return html;
 }
 
+// ---------- 폴더 뷰: 구분(phase) → 업무 → 세부업무, 간트+업무 목록 통합 (7차) ----------
+// 서류 파일철 컨셉 — 첫 화면엔 구분별 탭만 계단식으로 보이고, 탭을 클릭하면 그 구분이 펼쳐지면서
+// 업무 행(이름·담당자·현황·일정 막대가 한 줄)이 나타남. 업무 행을 다시 펼치면 세부업무 체크리스트.
+// 담당자별 업무 보기(#tableViewGroup)는 이번 개편과 무관하게 기존 표 방식 그대로 유지.
+function dateRangeForFolder() {
+  const dated = state.tasks.filter(t => t.start_date && t.end_date);
+  if (!dated.length) return null;
+  const minDate = dated.reduce((m, t) => t.start_date < m ? t.start_date : m, dated[0].start_date);
+  const maxDate = dated.reduce((m, t) => t.end_date > m ? t.end_date : m, dated[0].end_date);
+  return { minDate, maxDate, totalDays: Math.max(1, daysBetween(minDate, maxDate) + 1) };
+}
+function buildFolderBarHtml(t, range, phaseColor) {
+  if (!range || !t.start_date || !t.end_date) return `<span class="t-bar-empty">일정 미정</span>`;
+  const ts = deriveTaskStatus(t);
+  const off = daysBetween(range.minDate, t.start_date);
+  const len = Math.max(1, daysBetween(t.start_date, t.end_date) + 1);
+  const leftPct = Math.max(0, off / range.totalDays * 100);
+  const widthPct = Math.max(1.5, len / range.totalDays * 100);
+  let barColor = phaseColor;
+  if (ts.key === "delayed") barColor = "var(--delay)";
+  else if (ts.key === "done") barColor = "var(--ink-muted)";
+  else if (ts.key === "doing") barColor = "var(--accent)";
+  return `<span class="t-bar-track" title="${escapeHtml(t.start_date)} ~ ${escapeHtml(t.end_date)}"><span class="t-bar-fill" style="left:${leftPct}%;width:${widthPct}%;background:${barColor}"></span></span>`;
+}
+function folderPhaseSummary(tasks) {
+  const c = { todo: 0, doing: 0, delayed: 0, done: 0 };
+  tasks.forEach(t => c[deriveTaskStatus(t).key]++);
+  const parts = [];
+  if (c.doing) parts.push(`진행중 ${c.doing}`);
+  if (c.delayed) parts.push(`지연 ${c.delayed}`);
+  if (c.done) parts.push(`완료 ${c.done}`);
+  if (!parts.length) parts.push("예정만 있음");
+  return parts.join(" · ");
+}
+// 세부내용(시작일/종료일/선행업무/비고) — 담당자는 업무 행에 이미 있어서 여기선 뺌.
+// 선행업무 칩(.dep-chip-row)은 기존 buildDependencyFieldHtml/wireDependencyField/openDependencyPicker를
+// 그대로 재사용함 — #folderViewGroup이 index.html에서 (숨겨진) #tableViewGroup보다 앞에 있어서,
+// document.querySelector가 항상 이 폴더 뷰 쪽 요소를 먼저 찾아 갱신하기 때문에 별도 함수를 안 만들어도 됨.
+function buildFolderDetailFieldsHtml(t, dis) {
+  return `<div class="t-detail-fields">
+    <div class="fld"><label>시작일</label><input type="date" value="${t.start_date || ""}" data-field="start_date" data-id="${t.id}" ${dis}></div>
+    <div class="fld"><label>종료일</label><input type="date" value="${t.end_date || ""}" data-field="end_date" data-id="${t.id}" ${dis}></div>
+    <div class="fld"><label>선행업무</label>${buildDependencyFieldHtml(t)}</div>
+    <div class="fld"><label>비고</label><textarea class="autosize-textarea" rows="1" data-field="note" data-id="${t.id}" ${dis} placeholder="-">${escapeHtml(t.note)}</textarea></div>
+  </div>`;
+}
+function buildFolderSubRowHtml(s) {
+  const dis = !state.editMode;
+  return `<div class="sub-row${s.done ? " done" : ""}" data-sub-id="${s.id}">
+    ${!dis ? `<span class="sgrip" title="드래그해서 순서 변경">⠿</span>` : ""}
+    <input type="checkbox" data-action="fld-sub-check" data-sub-id="${s.id}" ${s.done ? "checked" : ""} ${dis ? "disabled" : ""}>
+    <input type="text" class="sname" value="${escapeHtml(s.name)}" data-action="fld-sub-rename" data-sub-id="${s.id}" ${dis ? "disabled" : ""}>
+    ${!dis ? `<button type="button" class="sub-del" data-action="fld-sub-del" data-sub-id="${s.id}" aria-label="삭제">✕</button>` : ""}
+  </div>`;
+}
+function buildFolderTaskRow(t, range, phaseColor, dis) {
+  const ts = deriveTaskStatus(t);
+  const subs = parseSubtasks(t.subtasks);
+  const hasSubs = subs.length > 0;
+  const canToggleSubs = hasSubs || state.editMode;
+  const subOpen = openFolderSubtasks.has(t.id);
+  const detailOpen = openFolderDetails.has(t.id);
+  const isChecklist = state.project && state.project.type === "checklist";
+  const doneCount = subs.filter(s => s.done).length;
+  return `
+    <div class="task-block${subOpen ? " open" : ""}${detailOpen ? " detail-open" : ""}" data-id="${t.id}" style="background:${phaseTintCss(t.phase_color, TASK_TINT_PCT)}">
+      <div class="task-row">
+        <span class="grip" title="드래그해서 순서 변경">⠿</span>
+        <button type="button" class="sub-caret-btn${subOpen ? " open" : ""}" data-action="fld-sub-toggle" data-id="${t.id}" ${canToggleSubs ? "" : `disabled tabindex="-1"`}><span class="sc">▾</span></button>
+        <span class="t-name">
+          <input class="t-name-input" value="${escapeHtml(t.name)}" data-field="name" data-id="${t.id}" ${dis} placeholder="업무명">
+          <span class="sub-badge" ${hasSubs ? "" : "hidden"}>${doneCount}/${subs.length}</span>
+        </span>
+        ${isChecklist ? `<span class="t-owner"></span>` : `<span class="t-owner">${buildOwnerSelectHtml(t.owner, t.id, dis)}</span>`}
+        <span class="t-status">${buildTaskStatusSelectHtml(t, ts, dis)}</span>
+        ${buildFolderBarHtml(t, range, phaseColor)}
+        <button type="button" class="t-detail-btn${detailOpen ? " open" : ""}" data-action="fld-detail-toggle" data-id="${t.id}">세부내용</button>
+        ${state.editMode ? `<button type="button" class="t-del" data-action="fld-del" data-id="${t.id}" aria-label="삭제">✕</button>` : `<span></span>`}
+      </div>
+      <div class="t-detail-wrap"><div class="t-detail-inner">${buildFolderDetailFieldsHtml(t, dis)}</div></div>
+      ${canToggleSubs ? `<div class="sub-wrap"><div class="sub-list" data-id="${t.id}">${subs.map(buildFolderSubRowHtml).join("")}${dis ? "" : `<div class="sub-add-row"><input type="text" class="sub-add-input" placeholder="세부 업무 추가 후 Enter"></div>`}</div></div>` : ""}
+    </div>`;
+}
+function toggleFolderDetail(id) {
+  if (openFolderDetails.has(id)) openFolderDetails.delete(id); else openFolderDetails.add(id);
+  const block = document.querySelector(`.task-block[data-id="${id}"]`);
+  if (!block) return;
+  const isOpen = openFolderDetails.has(id);
+  block.classList.toggle("detail-open", isOpen);
+  block.querySelector('[data-action="fld-detail-toggle"]')?.classList.toggle("open", isOpen);
+  if (isOpen) block.querySelectorAll("textarea.autosize-textarea").forEach(autosizeTextarea);
+}
+function toggleFolderSubtaskRow(id) {
+  if (openFolderSubtasks.has(id)) openFolderSubtasks.delete(id); else openFolderSubtasks.add(id);
+  const block = document.querySelector(`.task-block[data-id="${id}"]`);
+  if (!block) return;
+  const isOpen = openFolderSubtasks.has(id);
+  block.classList.toggle("open", isOpen);
+  block.querySelector('[data-action="fld-sub-toggle"]')?.classList.toggle("open", isOpen);
+  if (isOpen) block.querySelector(".sub-add-input")?.focus();
+}
+function wireFolderSubtaskDrag(root, taskId) {
+  root.querySelectorAll(".sub-row .sgrip").forEach(handle => {
+    handle.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      const row = handle.closest(".sub-row");
+      folderSubDragTracking = { taskId, row, startX: e.clientX, startY: e.clientY, dragging: false };
+    });
+  });
+}
+function wireFolderSubtaskList(root, taskId) {
+  root.querySelectorAll('[data-action="fld-sub-check"]').forEach(cb => {
+    cb.addEventListener("change", () => toggleSubtask(taskId, cb.dataset.subId));
+  });
+  root.querySelectorAll('[data-action="fld-sub-rename"]').forEach(inp => {
+    inp.addEventListener("change", () => renameSubtask(taskId, inp.dataset.subId, inp.value));
+  });
+  root.querySelectorAll('[data-action="fld-sub-del"]').forEach(btn => {
+    btn.addEventListener("click", () => deleteSubtask(taskId, btn.dataset.subId));
+  });
+  root.querySelectorAll(".sub-add-input").forEach(inp => {
+    inp.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      const name = inp.value.trim();
+      if (!name) return;
+      addSubtask(taskId, name);
+    });
+  });
+  wireFolderSubtaskDrag(root, taskId);
+}
+function refreshFolderSubtaskList(taskId) {
+  const list = document.querySelector(`.sub-list[data-id="${taskId}"]`);
+  const t = state.tasks.find(x => x.id === taskId);
+  if (!list || !t) return;
+  const subs = parseSubtasks(t.subtasks);
+  const dis = !state.editMode;
+  list.innerHTML = subs.map(buildFolderSubRowHtml).join("") + (dis ? "" : `<div class="sub-add-row"><input type="text" class="sub-add-input" placeholder="세부 업무 추가 후 Enter"></div>`);
+  wireFolderSubtaskList(list, taskId);
+  const block = list.closest(".task-block");
+  if (!block) return;
+  const doneCount = subs.filter(s => s.done).length;
+  const badge = block.querySelector(".sub-badge");
+  if (badge) { badge.textContent = `${doneCount}/${subs.length}`; badge.hidden = subs.length === 0; }
+  const caretBtn = block.querySelector('[data-action="fld-sub-toggle"]');
+  if (caretBtn && state.editMode) caretBtn.disabled = false;
+  else if (caretBtn) caretBtn.disabled = subs.length === 0;
+}
+function wireFolderTaskRow(block) {
+  block.querySelectorAll("input[data-field],select[data-field],textarea[data-field]").forEach(el => {
+    el.addEventListener("change", () => {
+      updateTaskField(el.dataset.id, el.dataset.field, el.value);
+      if (["status", "start_date", "end_date", "phase_name"].includes(el.dataset.field)) refreshTaskDerivedViews();
+    });
+  });
+  block.querySelectorAll("textarea.autosize-textarea").forEach(el => el.addEventListener("input", () => autosizeTextarea(el)));
+  if (block.classList.contains("detail-open")) block.querySelectorAll("textarea.autosize-textarea").forEach(autosizeTextarea);
+  block.querySelectorAll('[data-action="fld-del"]').forEach(el => el.addEventListener("click", () => deleteTask(el.dataset.id)));
+  block.querySelectorAll('[data-action="fld-detail-toggle"]').forEach(el => el.addEventListener("click", () => toggleFolderDetail(el.dataset.id)));
+  block.querySelectorAll('[data-action="fld-sub-toggle"]').forEach(el => el.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleFolderSubtaskRow(el.dataset.id);
+  }));
+  wireDependencyField(block);
+  wireFolderSubtaskList(block, block.dataset.id);
+}
+// 같은 구분(탭) 안에서만 업무 순서를 바꿈 — 폴더는 한 번에 한 구분만 펼쳐지는 구조라 다른 구분으로
+// 드래그해서 옮기는 건 애초에 불가능(안 보이니까). 순서를 바꾼 뒤 그 구분의 업무들만 새 순서로
+// 다시 끼워넣고 나머지는 그대로 둔 채 전체를 persistOrder()로 저장.
+function reorderFolderPhaseTasks(phaseKey, idsInOrder) {
+  const groups = groupTasksByPhase(state.tasks);
+  const newTasks = [];
+  groups.forEach(g => {
+    if (g.key === phaseKey) {
+      const byId = new Map(g.tasks.map(t => [t.id, t]));
+      idsInOrder.forEach(id => { const t = byId.get(id); if (t) newTasks.push(t); });
+    } else {
+      newTasks.push(...g.tasks);
+    }
+  });
+  state.tasks = newTasks;
+  persistOrder();
+}
+function wireFolderDragReorder(container, phaseKey) {
+  container.querySelectorAll(":scope > .task-block > .task-row .grip").forEach(handle => {
+    handle.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      const block = handle.closest(".task-block");
+      folderDragTracking = { block, container, phaseKey, startX: e.clientX, startY: e.clientY, dragging: false };
+    });
+  });
+}
+async function addTaskInPhase(phaseKey) {
+  const groupTasks = state.tasks.filter(t => phaseKeyOf(t.phase_name) === phaseKey);
+  const maxOrder = state.tasks.reduce((m, t) => Math.max(m, t.sort_order), 0);
+  const row = {
+    project_id: state.project.id, phase_name: phaseKey || "구분",
+    phase_color: groupTasks[0]?.phase_color || PALETTE[state.tasks.length % PALETTE.length],
+    name: "", owner: "", status: "todo", sort_order: maxOrder + 1
+  };
+  const { data, error } = await supabase.from("tasks").insert(row).select().single();
+  if (error) { console.error(error); return; }
+  state.tasks.push(data);
+  renderAll();
+}
+function wireFolderPhaseTabs(stack) {
+  stack.querySelectorAll('[data-action="fld-tab"]').forEach(btn => {
+    btn.addEventListener("click", () => {
+      const key = btn.dataset.phase;
+      openFolderPhase = openFolderPhase === key ? null : key;
+      saveOpenFolderPhase();
+      renderFolder();
+    });
+  });
+  stack.querySelectorAll('[data-action="fld-rename"]').forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const oldKey = btn.dataset.phase;
+      const newKey = (prompt("구분 이름을 입력하세요", oldKey) || "").trim();
+      if (!newKey || newKey === oldKey) return;
+      renamePhaseGroup(oldKey, newKey);
+    });
+  });
+  stack.querySelectorAll('[data-action="fld-add-task"]').forEach(el => el.addEventListener("click", () => addTaskInPhase(el.dataset.phase)));
+  const addPhaseBtn = stack.querySelector("#fldAddPhaseBtn");
+  if (addPhaseBtn) addPhaseBtn.addEventListener("click", addTask);
+}
+// 버튼은 클릭하면 브라우저가 자동으로 포커스를 주기 때문에, contains(activeElement)만 보면
+// "방금 누른 탭/캐럿 버튼 자신"도 "입력 중"으로 오인해서 재렌더링이 막혀버림(탭이 안 열리는 버그로 나타남).
+// 실제 텍스트를 입력하고 있는 input/textarea/select일 때만 재렌더링을 미루도록 좁힘.
+function isEditableFocused(container) {
+  const el = document.activeElement;
+  if (!el || !container.contains(el)) return false;
+  return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT";
+}
+function renderFolder() {
+  const stack = $("#folderStack");
+  if (!stack || !state.project) return;
+  if (isEditableFocused(stack)) return; // 입력 중이면 다시 그려서 포커스 끊기지 않게
+  const groups = groupTasksByPhase(state.tasks);
+  if (!groups.length) {
+    stack.innerHTML = state.editMode
+      ? `<div style="color:var(--ink-muted);font-size:13px;padding:20px;">아직 업무가 없습니다. <button type="button" class="side-add" id="fldAddPhaseBtn" style="display:inline;padding:0">+ 업무 추가</button></div>`
+      : `<div style="color:var(--ink-muted);font-size:13px;padding:20px;">아직 업무가 없습니다.</div>`;
+    wireFolderPhaseTabs(stack);
+    return;
+  }
+  const range = dateRangeForFolder();
+  const dis = !state.editMode ? "disabled" : "";
+  stack.innerHTML = groups.map(g => {
+    const isOpen = openFolderPhase === g.key;
+    const color = g.color || PALETTE[0];
+    return `
+    <div class="sheet${isOpen ? " open" : ""}" data-phase="${escapeHtml(g.key)}">
+      <button type="button" class="sheet-tab" style="background:${color}" data-action="fld-tab" data-phase="${escapeHtml(g.key)}">
+        <span class="car">▸</span>
+        <span class="tab-name">${escapeHtml(g.key || "구분")}</span>
+        <span class="cnt">${g.tasks.length}건</span>
+        ${state.editMode ? `<span class="tab-edit-btn" data-action="fld-rename" data-phase="${escapeHtml(g.key)}" title="구분 이름 바꾸기">✎</span>` : ""}
+      </button>
+      <div class="sheet-page" style="border-top:5px solid ${color}">
+        <div class="sheet-page-peek"><b>${folderPhaseSummary(g.tasks)}</b></div>
+        <div class="sheet-body"><div class="sheet-body-inner">
+          ${g.tasks.map(t => buildFolderTaskRow(t, range, color, dis)).join("")}
+          ${state.editMode ? `<div class="tab-foot"><span class="add" data-action="fld-add-task" data-phase="${escapeHtml(g.key)}">+ 업무 추가</span></div>` : ""}
+        </div></div>
+      </div>
+    </div>`;
+  }).join("") + (state.editMode ? `<div class="tab-foot"><span class="add" id="fldAddPhaseBtn">+ 새 구분 추가</span></div>` : "");
+
+  stack.querySelectorAll(".task-block").forEach(wireFolderTaskRow);
+  wireFolderPhaseTabs(stack);
+  const openSheet = stack.querySelector(".sheet.open");
+  if (openSheet && openFolderPhase) wireFolderDragReorder(openSheet.querySelector(".sheet-body-inner"), openFolderPhase);
+}
+
+// ---------- 사이드바: 오늘 할 일(자동 계산) / 주간 목표 / 체크할 일 (weekly_goals·check_items 테이블) ----------
+function renderTodayList() {
+  const el = $("#todayList");
+  if (!el || !state.project) return;
+  const today = todayStr();
+  const items = state.tasks.filter(t => t.start_date && t.end_date && t.start_date <= today && t.end_date >= today);
+  if (!items.length) { el.innerHTML = `<div class="side-empty">오늘 걸린 업무가 없습니다</div>`; return; }
+  el.innerHTML = items.map(t => {
+    const ts = deriveTaskStatus(t);
+    const tagClass = ts.key === "delayed" ? "today" : "plan";
+    return `
+    <label class="side-item${t.status === "done" ? " done" : ""}">
+      <input type="checkbox" data-action="today-done" data-id="${t.id}" ${t.status === "done" ? "checked" : ""} ${state.editMode ? "" : "disabled"}>
+      <span class="stxt">${escapeHtml(t.name || "(제목 없음)")}</span>
+      <span class="stag ${tagClass}">${ts.label}</span>
+    </label>`;
+  }).join("");
+  el.querySelectorAll('[data-action="today-done"]').forEach(cb => {
+    cb.addEventListener("change", () => {
+      updateTaskField(cb.dataset.id, "status", cb.checked ? "done" : "todo");
+      refreshTaskDerivedViews();
+    });
+  });
+}
+function renderGoalList() {
+  const el = $("#goalList");
+  if (!el || !state.project) return;
+  if (isEditableFocused(el)) return;
+  if (!state.weeklyGoals.length) {
+    el.innerHTML = `<div class="side-empty">아직 등록한 목표가 없습니다</div>`;
+    return;
+  }
+  el.innerHTML = state.weeklyGoals.map(g => `
+    <div class="goal-item">
+      <div class="goal-top">
+        <input class="gname" value="${escapeHtml(g.name)}" data-id="${g.id}" placeholder="목표 이름" ${state.editMode ? "" : "readonly"}>
+        <span class="gpct">${g.pct}%</span>
+      </div>
+      <div class="goal-bar" data-action="goal-bar" data-id="${g.id}"><div class="goal-fill" style="width:${g.pct}%"></div></div>
+      ${state.editMode ? `<button type="button" class="side-del" data-action="goal-del" data-id="${g.id}" aria-label="삭제">✕</button>` : ""}
+    </div>`).join("");
+  el.querySelectorAll(".gname").forEach(inp => {
+    inp.addEventListener("change", () => updateGoalField(inp.dataset.id, "name", inp.value));
+  });
+  el.querySelectorAll('[data-action="goal-bar"]').forEach(bar => {
+    if (!state.editMode) return;
+    bar.addEventListener("click", (e) => {
+      const rect = bar.getBoundingClientRect();
+      const pct = Math.max(0, Math.min(100, Math.round((e.clientX - rect.left) / rect.width * 100)));
+      updateGoalField(bar.dataset.id, "pct", pct);
+      bar.querySelector(".goal-fill").style.width = pct + "%";
+      bar.closest(".goal-item").querySelector(".gpct").textContent = pct + "%";
+    });
+  });
+  el.querySelectorAll('[data-action="goal-del"]').forEach(btn => {
+    btn.addEventListener("click", () => deleteWeeklyGoal(btn.dataset.id));
+  });
+}
+async function addWeeklyGoal() {
+  if (!state.project) return;
+  const maxOrder = state.weeklyGoals.reduce((m, g) => Math.max(m, g.sort_order), 0);
+  const row = { project_id: state.project.id, name: "", pct: 0, sort_order: maxOrder + 1 };
+  const { data, error } = await supabase.from("weekly_goals").insert(row).select().single();
+  if (error) { console.error(error); alert("목표 추가에 실패했습니다. sidebar-widgets-schema.sql을 Supabase에 실행하셨는지 확인해주세요.\n\n" + error.message); return; }
+  state.weeklyGoals.push(data);
+  renderGoalList();
+}
+function updateGoalField(id, field, value) {
+  const g = state.weeklyGoals.find(x => x.id === id);
+  if (!g) return;
+  g[field] = field === "pct" ? Number(value) : value;
+  debounceSave("goal-" + id + "-" + field, async () => {
+    await supabase.from("weekly_goals").update({ [field]: g[field] }).eq("id", id);
+  });
+}
+async function deleteWeeklyGoal(id) {
+  state.weeklyGoals = state.weeklyGoals.filter(g => g.id !== id);
+  renderGoalList();
+  await supabase.from("weekly_goals").delete().eq("id", id);
+}
+function renderCheckList() {
+  const el = $("#checkList");
+  if (!el || !state.project) return;
+  if (isEditableFocused(el)) return;
+  if (!state.checkItems.length) {
+    el.innerHTML = `<div class="side-empty">체크할 일이 없습니다</div>`;
+    return;
+  }
+  el.innerHTML = state.checkItems.map(c => `
+    <label class="side-item${c.done ? " done" : ""}">
+      <input type="checkbox" data-action="check-done" data-id="${c.id}" ${c.done ? "checked" : ""} ${state.editMode ? "" : "disabled"}>
+      <input class="stxt" value="${escapeHtml(c.name)}" data-action="check-rename" data-id="${c.id}" placeholder="체크할 일" ${state.editMode ? "" : "readonly"}>
+      ${state.editMode ? `<button type="button" class="side-del" data-action="check-del" data-id="${c.id}" aria-label="삭제">✕</button>` : ""}
+    </label>`).join("");
+  el.querySelectorAll('[data-action="check-done"]').forEach(cb => {
+    cb.addEventListener("change", () => toggleCheckItem(cb.dataset.id, cb.checked));
+  });
+  el.querySelectorAll('[data-action="check-rename"]').forEach(inp => {
+    inp.addEventListener("change", () => updateCheckItemField(inp.dataset.id, "name", inp.value));
+  });
+  el.querySelectorAll('[data-action="check-del"]').forEach(btn => {
+    btn.addEventListener("click", () => deleteCheckItem(btn.dataset.id));
+  });
+}
+async function addCheckItem() {
+  if (!state.project) return;
+  const maxOrder = state.checkItems.reduce((m, c) => Math.max(m, c.sort_order), 0);
+  const row = { project_id: state.project.id, name: "", done: false, sort_order: maxOrder + 1 };
+  const { data, error } = await supabase.from("check_items").insert(row).select().single();
+  if (error) { console.error(error); alert("체크할 일 추가에 실패했습니다. sidebar-widgets-schema.sql을 Supabase에 실행하셨는지 확인해주세요.\n\n" + error.message); return; }
+  state.checkItems.push(data);
+  renderCheckList();
+}
+function updateCheckItemField(id, field, value) {
+  const c = state.checkItems.find(x => x.id === id);
+  if (!c) return;
+  c[field] = value;
+  debounceSave("check-" + id + "-" + field, async () => {
+    await supabase.from("check_items").update({ [field]: value }).eq("id", id);
+  });
+}
+function toggleCheckItem(id, done) {
+  const c = state.checkItems.find(x => x.id === id);
+  if (!c) return;
+  c.done = done;
+  updateCheckItemField(id, "done", done);
+  renderCheckList();
+}
+async function deleteCheckItem(id) {
+  state.checkItems = state.checkItems.filter(c => c.id !== id);
+  renderCheckList();
+  await supabase.from("check_items").delete().eq("id", id);
+}
+function renderSidebar() {
+  renderTodayList();
+  renderGoalList();
+  renderCheckList();
+}
+function wireSidebar() {
+  $("#goalAddBtn")?.addEventListener("click", addWeeklyGoal);
+  $("#checkAddBtn")?.addEventListener("click", addCheckItem);
+}
+function applyRemoteGoalChange(payload) {
+  if (payload.eventType === "INSERT") {
+    if (!state.weeklyGoals.find(g => g.id === payload.new.id)) state.weeklyGoals.push(payload.new);
+  } else if (payload.eventType === "DELETE") {
+    state.weeklyGoals = state.weeklyGoals.filter(g => g.id !== payload.old.id);
+  } else {
+    const i = state.weeklyGoals.findIndex(g => g.id === payload.new.id);
+    if (i >= 0) state.weeklyGoals[i] = payload.new;
+  }
+  renderGoalList();
+}
+function applyRemoteCheckChange(payload) {
+  if (payload.eventType === "INSERT") {
+    if (!state.checkItems.find(c => c.id === payload.new.id)) state.checkItems.push(payload.new);
+  } else if (payload.eventType === "DELETE") {
+    state.checkItems = state.checkItems.filter(c => c.id !== payload.old.id);
+  } else {
+    const i = state.checkItems.findIndex(c => c.id === payload.new.id);
+    if (i >= 0) state.checkItems[i] = payload.new;
+  }
+  renderCheckList();
+}
+
 function buildTaskCardHtml(t, idx, dis) {
   const ts = deriveTaskStatus(t);
   const isChecklist = state.project && state.project.type === "checklist";
@@ -1747,22 +2251,25 @@ function wireColumnResize() {
   });
 }
 
-// ---------- desktop view switcher (전체업무 / 간트차트 / 업무 목록 / 담당자별 업무) ----------
-const VIEW_MODES = ["all", "gantt", "table", "owner"];
+// ---------- desktop view switcher (업무[구분 폴더 탭] / 담당자별 업무) ----------
+// "간트차트"/"업무 목록"/"전체업무"를 따로 보던 옛 모드는 7차 개편으로 없어지고 폴더 탭 하나로 통합됨.
+// #ganttViewGroup/#tableViewGroup(phase-grouped 표) 자체는 지우지 않고 항상 숨겨만 둠 — 모바일 타임라인
+// 오버레이가 buildGanttHtml을 그대로 쓰고, 담당자별 업무는 기존 표 렌더링을 그대로 재사용하기 때문.
+const VIEW_MODES = ["folder", "owner"];
 function loadViewMode(pid) {
   const v = localStorage.getItem("viewMode_" + pid);
-  return VIEW_MODES.includes(v) ? v : "all";
+  return VIEW_MODES.includes(v) ? v : "folder";
 }
 function saveViewMode() {
   if (!state.project) return;
   try { localStorage.setItem("viewMode_" + state.project.id, viewMode); } catch (e) {}
 }
 function applyViewMode() {
-  const showGantt = viewMode === "all" || viewMode === "gantt";
-  const showTable = viewMode !== "gantt";
-  $("#ganttViewGroup").hidden = !showGantt;
-  $("#tableViewGroup").hidden = !showTable;
-  $("#tableSectionTitle").textContent = viewMode === "owner" ? "담당자별 업무" : "업무 목록";
+  const showFolder = viewMode !== "owner";
+  $("#folderViewGroup").hidden = !showFolder;
+  $("#ganttViewGroup").hidden = true;
+  $("#tableViewGroup").hidden = showFolder;
+  $("#tableSectionTitle").textContent = "담당자별 업무";
   $$(".view-nav-item[data-view]").forEach(btn => btn.classList.toggle("active", btn.dataset.view === viewMode));
   renderTable();
 }
@@ -1880,6 +2387,56 @@ function wireStaticUI() {
       persistSubtaskOrder(subtaskDragTracking.taskId);
     }
     subtaskDragTracking = null;
+  });
+
+  // 폴더 뷰: 같은 구분(펼쳐진 탭) 안에서 업무 행 드래그 재정렬 — 업무 행 위쪽에 세부내용/세부업무가
+  // .task-block의 자식으로 같이 붙어있어서(옛 테이블처럼 형제 <tr>을 따로 챙길 필요 없이) 블록째로 옮기면 됨.
+  document.addEventListener("pointermove", (e) => {
+    if (!folderDragTracking) return;
+    if (!folderDragTracking.dragging) {
+      const moved = Math.hypot(e.clientX - folderDragTracking.startX, e.clientY - folderDragTracking.startY);
+      if (moved < DRAG_THRESHOLD) return;
+      folderDragTracking.dragging = true;
+      folderDragTracking.block.classList.add("dragging");
+    }
+    const overBlock = document.elementFromPoint(e.clientX, e.clientY)?.closest(".task-block");
+    if (!overBlock || overBlock === folderDragTracking.block || overBlock.parentNode !== folderDragTracking.container) return;
+    const rect = overBlock.getBoundingClientRect();
+    const before = (e.clientY - rect.top) < rect.height / 2;
+    overBlock.parentNode.insertBefore(folderDragTracking.block, before ? overBlock : overBlock.nextSibling);
+  });
+  document.addEventListener("pointerup", () => {
+    if (!folderDragTracking) return;
+    if (folderDragTracking.dragging) {
+      folderDragTracking.block.classList.remove("dragging");
+      const ids = Array.from(folderDragTracking.container.querySelectorAll(":scope > .task-block")).map(b => b.dataset.id);
+      reorderFolderPhaseTasks(folderDragTracking.phaseKey, ids);
+    }
+    folderDragTracking = null;
+  });
+  // 폴더 뷰: 세부업무 드래그 재정렬 (같은 업무 안에서만)
+  document.addEventListener("pointermove", (e) => {
+    if (!folderSubDragTracking) return;
+    if (!folderSubDragTracking.dragging) {
+      const moved = Math.hypot(e.clientX - folderSubDragTracking.startX, e.clientY - folderSubDragTracking.startY);
+      if (moved < DRAG_THRESHOLD) return;
+      folderSubDragTracking.dragging = true;
+      folderSubDragTracking.row.classList.add("dragging");
+    }
+    const overRow = document.elementFromPoint(e.clientX, e.clientY)?.closest(".sub-row");
+    const overList = overRow?.closest(".sub-list");
+    if (!overRow || overRow === folderSubDragTracking.row || !overList || overList.dataset.id !== folderSubDragTracking.taskId) return;
+    const rect = overRow.getBoundingClientRect();
+    const before = (e.clientY - rect.top) < rect.height / 2;
+    overRow.parentNode.insertBefore(folderSubDragTracking.row, before ? overRow : overRow.nextSibling);
+  });
+  document.addEventListener("pointerup", () => {
+    if (!folderSubDragTracking) return;
+    if (folderSubDragTracking.dragging) {
+      folderSubDragTracking.row.classList.remove("dragging");
+      persistFolderSubtaskOrder(folderSubDragTracking.taskId);
+    }
+    folderSubDragTracking = null;
   });
 
   const wireFilterPair = (key, ids) => {

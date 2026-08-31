@@ -108,9 +108,7 @@
   <nav class="view-nav-panel" id="viewNavPanel" hidden>
     <a href="./" class="view-nav-item view-nav-home"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 0 0 1 1h3v-6h6v6h3a1 1 0 0 0 1-1V10"/></svg> 목록</a>
     <div class="view-nav-divider"></div>
-    <button type="button" class="view-nav-item" data-view="all">전체업무</button>
-    <button type="button" class="view-nav-item" data-view="gantt">간트차트</button>
-    <button type="button" class="view-nav-item" data-view="table">업무 목록</button>
+    <button type="button" class="view-nav-item" data-view="folder">업무</button>
     <button type="button" class="view-nav-item" data-view="owner">담당자별 업무</button>
   </nav>
 
@@ -130,7 +128,32 @@
   <div class="owner-summary" id="ownerSummary" hidden></div>
 
   <section class="board desktop-only">
-    <div class="view-group" id="ganttViewGroup">
+    <div class="view-group" id="folderViewGroup">
+      <div class="folder-layout">
+        <aside class="side">
+          <div class="side-card">
+            <h2><span class="ic">☀️</span> 오늘 할 일</h2>
+            <div class="side-list" id="todayList"></div>
+          </div>
+          <div class="side-card">
+            <h2><span class="ic">🎯</span> 주간 목표</h2>
+            <div class="side-list" id="goalList"></div>
+            <div class="side-add" id="goalAddBtn">+ 목표 추가</div>
+          </div>
+          <div class="side-card">
+            <h2><span class="ic">📌</span> 체크할 일</h2>
+            <div class="side-list" id="checkList"></div>
+            <div class="side-add" id="checkAddBtn">+ 체크할 일 추가</div>
+          </div>
+        </aside>
+        <div class="folder-main">
+          <div class="folder-cover">
+            <div class="sheet-stack" id="folderStack"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="view-group" id="ganttViewGroup" hidden>
       <div class="board-toolbar">
         <div class="legend" id="legendDesktop"></div>
         <button type="button" class="today-toggle-btn" id="todayToggleBtn"></button>
