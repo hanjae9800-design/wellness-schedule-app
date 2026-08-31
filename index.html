@@ -131,19 +131,23 @@
     <div class="view-group" id="folderViewGroup">
       <div class="folder-layout">
         <aside class="side">
-          <div class="side-card">
-            <h2><span class="ic">☀️</span> 오늘 할 일</h2>
-            <div class="side-list" id="todayList"></div>
-          </div>
-          <div class="side-card">
-            <h2><span class="ic">🎯</span> 주간 목표</h2>
-            <div class="side-list" id="goalList"></div>
-            <div class="side-add" id="goalAddBtn">+ 목표 추가</div>
-          </div>
-          <div class="side-card">
-            <h2><span class="ic">📌</span> 체크할 일</h2>
-            <div class="side-list" id="checkList"></div>
-            <div class="side-add" id="checkAddBtn">+ 체크할 일 추가</div>
+          <div class="side-paper">
+            <div class="side-clip" aria-hidden="true"></div>
+            <section class="side-sec">
+              <h2><span class="ic">☀️</span> 오늘 할 일</h2>
+              <div class="side-list" id="todayList"></div>
+            </section>
+            <section class="side-sec">
+              <h2><span class="ic">🎯</span> 주간 목표</h2>
+              <div class="goal-summary" id="goalSummary"></div>
+              <div class="side-list" id="goalList"></div>
+              <div class="side-add" id="goalAddBtn">+ 목표 추가</div>
+            </section>
+            <section class="side-sec">
+              <h2><span class="ic">📌</span> 체크할 일</h2>
+              <div class="side-list" id="checkList"></div>
+              <div class="side-add" id="checkAddBtn">+ 체크할 일 추가</div>
+            </section>
           </div>
         </aside>
         <div class="folder-main">

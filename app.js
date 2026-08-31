@@ -1946,10 +1946,27 @@ function renderTodayList() {
     });
   });
 }
+// "N/전체 완료" 카운트 + 전체 진행률 바 — "완료"는 pct 100인 목표 수, 진행률은 목표들의 pct 평균
+// (목표를 하나도 안 채웠어도 절반쯤 진행된 목표가 있으면 그만큼 반영되도록 평균으로 계산)
+function renderGoalSummary() {
+  const el = $("#goalSummary");
+  if (!el || !state.project) return;
+  const total = state.weeklyGoals.length;
+  if (!total) { el.innerHTML = ""; return; }
+  const done = state.weeklyGoals.filter(g => g.pct >= 100).length;
+  const avgPct = Math.round(state.weeklyGoals.reduce((sum, g) => sum + g.pct, 0) / total);
+  el.innerHTML = `
+    <div class="goal-summary-row">
+      <span class="goal-summary-count">${done}<small>/${total}</small></span>
+      <span class="goal-summary-label">이번 주 진행률 <b>${avgPct}%</b></span>
+    </div>
+    <div class="goal-summary-bar"><div class="goal-summary-bar-fill" style="width:${avgPct}%"></div></div>`;
+}
 function renderGoalList() {
   const el = $("#goalList");
   if (!el || !state.project) return;
   if (isEditableFocused(el)) return;
+  renderGoalSummary();
   if (!state.weeklyGoals.length) {
     el.innerHTML = `<div class="side-empty">아직 등록한 목표가 없습니다</div>`;
     return;
@@ -1974,6 +1991,7 @@ function renderGoalList() {
       updateGoalField(bar.dataset.id, "pct", pct);
       bar.querySelector(".goal-fill").style.width = pct + "%";
       bar.closest(".goal-item").querySelector(".gpct").textContent = pct + "%";
+      renderGoalSummary();
     });
   });
   el.querySelectorAll('[data-action="goal-del"]').forEach(btn => {
