@@ -486,7 +486,7 @@ select.task-status-badge:disabled { cursor: default; opacity: .85; }
 .t-detail-inner { overflow: hidden; min-height: 0; }
 .t-detail-fields { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; padding: 4px 22px 14px 54px; }
 .t-detail-fields .fld label { font-size: 11px; color: var(--ink-muted); display: block; margin-bottom: 4px; }
-.t-detail-fields .fld select, .t-detail-fields .fld input, .t-detail-fields .fld textarea { width: 100%; font: inherit; font-size: 12.5px; border: 1px solid var(--border); border-radius: 7px; padding: 6px 8px; background: var(--page); color: var(--ink); box-sizing: border-box; }
+.t-detail-fields .fld select, .t-detail-fields .fld input, .t-detail-fields .fld textarea { width: 100%; font: inherit; font-size: 12.5px; border: 1px solid var(--border); border-radius: 7px; padding: 6px 8px; background: var(--surface); color: var(--ink); box-sizing: border-box; }
 
 /* 세부업무 (3뎁스: 구분 탭 → 업무 행 → 세부업무) */
 .sub-wrap { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .22s cubic-bezier(.4,0,.2,1); }
@@ -505,8 +505,8 @@ select.task-status-badge:disabled { cursor: default; opacity: .85; }
 .sub-row:hover .sub-del { opacity: 1; }
 .sub-row .sub-del:hover { color: var(--critical); }
 .sub-add-row { padding: 4px 8px 0; }
-.sub-add-input { width: 100%; font: inherit; font-size: 12px; border: 1px dashed var(--border-strong); border-radius: 7px; padding: 5px 9px; background: var(--page); color: var(--ink); box-sizing: border-box; }
-.sub-add-input:focus { outline: none; border-color: var(--accent); border-style: solid; background: var(--surface); }
+.sub-add-input { width: 100%; font: inherit; font-size: 12px; border: 1px dashed var(--border-strong); border-radius: 7px; padding: 5px 9px; background: var(--surface); color: var(--ink); box-sizing: border-box; }
+.sub-add-input:focus { outline: none; border-color: var(--accent); border-style: solid; }
 
 @media (max-width: 1180px) {
   .folder-layout { flex-direction: column; }
