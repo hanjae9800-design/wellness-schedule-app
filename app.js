@@ -2271,6 +2271,9 @@ function applyViewMode() {
   $("#tableViewGroup").hidden = showFolder;
   $("#tableSectionTitle").textContent = "담당자별 업무";
   $$(".view-nav-item[data-view]").forEach(btn => btn.classList.toggle("active", btn.dataset.view === viewMode));
+  // 업무(폴더) 뷰일 때만 왼쪽에 고정 사이드바가 뜸 — 그 위 공통 영역(통계 바 등)도
+  // 사이드바에 가리지 않게 같이 오른쪽으로 밀어야 해서 #app에 클래스로 표시해둠 (style.css 참고)
+  $("#app").classList.toggle("has-side-rail", showFolder);
   renderTable();
 }
 function setViewMode(mode) {
